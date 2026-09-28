@@ -1,0 +1,87 @@
+# slam_toolbox online async mapping config for the Moz1 + MID360.
+# Tuned for indoor lab use at walking pace. Re-tune resolution / loop-closure
+# thresholds once a real environment is mapped.
+#
+# Frame contract:
+#   /scan        from pointcloud_to_laserscan (sensor_msgs/LaserScan)
+#   odom         from robot_localization ekf (odom_ekf.launch.py)
+#   base_link    body frame
+#   map          slam_toolbox publishes map -> odom
+
+slam_toolbox:
+  ros__parameters:
+    # ---- Plugin / mode -----------------------------------------------------
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    mode: mapping
+
+    # ---- Frames / topics ---------------------------------------------------
+    map_frame: map
+    odom_frame: odom
+    base_frame: base_link
+    scan_topic: /scan
+    use_map_saver: true
+
+    # ---- Solver loop --------------------------------------------------------
+    transform_publish_period: 0.05
+    map_update_interval: 1.0
+    resolution: 0.05
+    # MID360 LaserScan range_min is 0.2 (from pointcloud_to_scan.yaml).
+    # slam_toolbox warns whenever min_laser_range <= the scan's range_min.
+    # 0.25 silences the warning AND filters out spurious near-range echoes.
+    min_laser_range: 0.25
+    max_laser_range: 20.0       # match pointcloud_to_scan.yaml::range_max
+    minimum_time_interval: 0.2  # seconds between scans considered
+    # Hold ~30 s of TF history so we can wait for odom->base_link to catch up
+    # at startup instead of dropping the very first scans.
+    tf_buffer_duration: 30.0
+
+    # ---- Scan matching ------------------------------------------------------
+    # Because our odom (yaw-rate-only EKF) provides almost no linear-motion
+    # prior, slam_toolbox needs to scan-match more eagerly. Lower the
+    # minimum_travel_* thresholds so scans are accepted on small motion;
+    # raise scan_buffer_size so a moving robot can localise against more
+    # historical scans.
+    debug_logging: false
+    throttle_scans: 1
+    use_scan_matching: true
+    use_scan_barycenter: true
+    minimum_travel_distance: 0.1
+    minimum_travel_heading: 0.1
+    scan_buffer_size: 20
+    scan_buffer_maximum_scan_distance: 10.0
+    link_match_minimum_response_fine: 0.1
+    link_scan_maximum_distance: 1.5
+
+    # ---- Loop closure -------------------------------------------------------
+    # Slightly loosened thresholds: with yaw-only odom prior, more loop
+    # closures help re-anchor pose drift.
+    do_loop_closing: true
+    loop_match_minimum_chain_size: 8
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.30
+    loop_match_minimum_response_fine: 0.40
+
+    # ---- Correlation parameters --------------------------------------------
+    correlation_search_space_dimension: 0.5
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1
+
+    loop_search_space_dimension: 8.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
+
+    # ---- Match thresholds ---------------------------------------------------
+    distance_variance_penalty: 0.5
+    angle_variance_penalty: 1.0
+    fine_search_angle_offset: 0.00349
+    coarse_search_angle_offset: 0.349
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true

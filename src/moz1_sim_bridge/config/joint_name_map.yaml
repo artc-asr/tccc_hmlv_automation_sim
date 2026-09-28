@@ -1,0 +1,52 @@
+# joint_name_map.yaml  --  sim joint name  ->  canonical URDF name.
+#
+# Populate this from the "REMAP SKELETON" that discover_prims.py prints inside
+# Isaac Sim (Phase 1). Left side = exact sim joint name; right side = the
+# canonical name the real moz1_description / moz1_moveit_config uses.
+#
+# Rules:
+#   * Any sim joint NOT listed here passes through unchanged.
+#   * Blank values are ignored (treated as "not yet mapped" -> pass-through).
+#   * Keep this in sync if the sim USD joints change.
+#
+# The entries below are a STARTING GUESS based on the known wheel naming
+# (sim 'Base_0' underscore vs real 'Base-0' hyphen). VERIFY/COMPLETE the arm,
+# torso, and gripper rows against discover_prims.py output before trusting
+# MoveIt execution.
+
+sim_to_canonical:
+  # --- mecanum wheels (confirmed underscore->hyphen) ---
+  "Base_0": "Base-0"
+  "Base_1": "Base-1"
+  "Base_2": "Base-2"
+  "Base_3": "Base-3"
+
+  # --- torso (6 DOF) --- TODO: confirm sim names from discover_prims
+  # "LegWaist_0": "LegWaist-0"
+  # "LegWaist_1": "LegWaist-1"
+  # "LegWaist_2": "LegWaist-2"
+  # "LegWaist_3": "LegWaist-3"
+  # "LegWaist_4": "LegWaist-4"
+  # "LegWaist_5": "LegWaist-5"
+
+  # --- left arm (7 DOF) --- TODO: confirm sim names
+  # "LeftArm_0": "LeftArm-0"
+  # "LeftArm_1": "LeftArm-1"
+  # "LeftArm_2": "LeftArm-2"
+  # "LeftArm_3": "LeftArm-3"
+  # "LeftArm_4": "LeftArm-4"
+  # "LeftArm_5": "LeftArm-5"
+  # "LeftArm_6": "LeftArm-6"
+
+  # --- right arm (7 DOF) --- TODO: confirm sim names
+  # "RightArm_0": "RightArm-0"
+  # "RightArm_1": "RightArm-1"
+  # "RightArm_2": "RightArm-2"
+  # "RightArm_3": "RightArm-3"
+  # "RightArm_4": "RightArm-4"
+  # "RightArm_5": "RightArm-5"
+  # "RightArm_6": "RightArm-6"
+
+  # --- grippers --- TODO: confirm sim names
+  # "left_gripper_joint": "left_gripper_joint"
+  # "right_gripper_joint": "right_gripper_joint"

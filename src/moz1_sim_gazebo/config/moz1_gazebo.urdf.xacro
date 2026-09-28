@@ -1,0 +1,227 @@
+<?xml version="1.0"?>
+<!-- ========================================================================
+     moz1_gazebo.urdf.xacro  (moz1_sim_gazebo)  ::  Gazebo FORTRESS (gz-sim via ros_gz)
+
+     New-Gazebo (Ignition Fortress) model of the Moz1. Wraps the SAME
+     moz1_description used by RViz / MoveIt / the real robot, and adds the gz-sim
+     pieces so the sim presents the SAME ROS2 contract as the real robot and Isaac:
+
+       PUB /livox/lidar  sensor_msgs/PointCloud2  frame livox_frame  (gz gpu_lidar)
+       PUB /livox/imu    sensor_msgs/Imu          frame livox_frame  (gz imu)
+       PUB /odom  + TF odom->base_link            (OdometryPublisher system)
+       PUB /joint_states                          (ign_ros2_control + JSB, native ROS2)
+       SUB /cmd_vel  geometry_msgs/Twist          (VelocityControl system, holonomic)
+       + MoveIt FollowJointTrajectory controllers (ign_ros2_control)
+
+     The gz sensors/base publish on GZ topics; ros_gz_bridge (see the launch)
+     converts them to/from ROS2. ros2_control (arms) is NATIVE ROS2 via
+     ign_ros2_control, so /joint_states + the controllers need no bridge.
+
+     Requires: moz1_description processed with gazebo_inertials:=true (the launch
+     does this) so moving links have mass+inertia.
+     ===================================================================== -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="moz1">
+
+  <!-- lidar: gz gpu_lidar needs a working GPU render engine (ogre2). On GPUs
+       Mesa can't drive (e.g. very new Intel), it stalls the sim — set lidar:=false
+       to run control/base/arm without it (the launch passes this through). -->
+  <xacro:arg name="lidar" default="true"/>
+  <!-- fix_base: true pins base_link to a `world` link (stable, upright — for
+       MoveIt/manipulation; also gives MoveIt the `world` frame the SRDF wants).
+       false = free holonomic base driven by /cmd_vel (VelocityControl). -->
+  <xacro:arg name="fix_base" default="false"/>
+
+  <!-- Same description used by the real MoveIt config + RViz. -->
+  <xacro:include filename="$(find moz1_description)/urdf/moz1.urdf.xacro"/>
+  <xacro:include filename="moz1_cameras.xacro"/>
+
+
+  <!-- ============ Livox mount frame (base_link -> livox_frame) =================
+       Mounted on the BASE TOP, matching the real robot's Livox puck (the white
+       disc on the platform). z=0.30 ≈ base-top surface. TODO(fine-tune): nudge
+       x,y so it sits exactly on the physical mount — from RViz compare livox_frame
+       to the white circle and adjust. Note: it's low, so the torso partially
+       occludes the rear 360° (as on the real robot, which uses 3D FAST-LIO2). -->
+  <link name="livox_frame">
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="1e-4" ixy="0" ixz="0" iyy="1e-4" iyz="0" izz="1e-4"/>
+    </inertial>
+  </link>
+  <joint name="livox_frame_joint" type="fixed">
+    <origin xyz="0 0 0.30" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="livox_frame"/>
+  </joint>
+
+  <!-- fix_base: pin the robot to a `world` link so it stands upright for arm work
+       (and publishes the `world` TF the MoveIt SRDF virtual_joint expects). z lifts
+       it to ~wheel height so it isn't sunk into the ground. -->
+  <xacro:if value="$(arg fix_base)">
+    <link name="world"/>
+    <joint name="world_to_base" type="fixed">
+      <origin xyz="0 0 0.10" rpy="0 0 0"/>
+      <parent link="world"/>
+      <child link="base_link"/>
+    </joint>
+  </xacro:if>
+
+  <!-- ===================== ros2_control (arms/torso/grippers) ==================
+       IgnitionSystem exposes the SAME joints/interfaces the real controllers use,
+       so moz1_moveit_config's FollowJointTrajectory controllers drive it unchanged. -->
+  <ros2_control name="moz1_gz_system" type="system">
+    <hardware>
+      <!-- <plugin>ign_ros2_control/IgnitionSystem</plugin> -->
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+
+    <xacro:macro name="pos_joint" params="name init">
+      <joint name="${name}">
+        <command_interface name="position"/>
+        <state_interface name="position"><param name="initial_value">${init}</param></state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+    </xacro:macro>
+
+    <!-- Wheels: STATE-ONLY (no command) so /joint_states is complete for MoveIt's
+         planning scene; the base is driven holonomically by VelocityControl, not
+         these joints. Without them MoveIt warns "Missing Base-0..3" and won't plan. -->
+    <xacro:macro name="state_joint" params="name">
+      <joint name="${name}">
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+    </xacro:macro>
+    <xacro:state_joint name="Base-0"/>
+    <xacro:state_joint name="Base-1"/>
+    <xacro:state_joint name="Base-2"/>
+    <xacro:state_joint name="Base-3"/>
+
+    <!-- torso home pose (deg [0, 60, -90, 30, 0, 0]) from the robot's
+         home_joint_states.yaml / robot.yaml — folds the leg/waist into the upright
+         standing stance. Keep in sync with that source of truth. -->
+    <xacro:pos_joint name="LegWaist-0" init="0.0"/>
+    <xacro:pos_joint name="LegWaist-1" init="1.0471975512"/>
+    <xacro:pos_joint name="LegWaist-2" init="-1.5707963268"/>
+    <xacro:pos_joint name="LegWaist-3" init="0.5235987756"/>
+    <xacro:pos_joint name="LegWaist-4" init="0.0"/>
+    <xacro:pos_joint name="LegWaist-5" init="0.0"/>
+
+    <xacro:pos_joint name="LeftArm-0" init="-0.1570796327"/>
+    <xacro:pos_joint name="LeftArm-1" init="-0.8726646260"/>
+    <xacro:pos_joint name="LeftArm-2" init="-0.3490658504"/>
+    <xacro:pos_joint name="LeftArm-3" init="-1.5707963268"/>
+    <xacro:pos_joint name="LeftArm-4" init="-0.6108652381"/>
+    <xacro:pos_joint name="LeftArm-5" init="0.1396263402"/>
+    <xacro:pos_joint name="LeftArm-6" init="-0.1221730476"/>
+
+    <xacro:pos_joint name="RightArm-0" init="0.1570796327"/>
+    <xacro:pos_joint name="RightArm-1" init="-0.8726646260"/>
+    <xacro:pos_joint name="RightArm-2" init="0.3490658504"/>
+    <xacro:pos_joint name="RightArm-3" init="1.5707963268"/>
+    <xacro:pos_joint name="RightArm-4" init="0.6108652381"/>
+    <xacro:pos_joint name="RightArm-5" init="0.1396263402"/>
+    <xacro:pos_joint name="RightArm-6" init="0.1221730476"/>
+
+    <xacro:pos_joint name="left_gripper_joint"  init="0.03"/>
+    <xacro:pos_joint name="right_gripper_joint" init="0.03"/>
+  </ros2_control>
+
+  <!-- ign_ros2_control plugin: runs the controller_manager as a native ROS2 node. -->
+  <gazebo>
+    <!-- <plugin filename="ign_ros2_control-system" name="ign_ros2_control::IgnitionROS2ControlPlugin"> -->
+      <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(find moz1_sim_gazebo)/config/gazebo_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+  <!-- ============ Grasp emulation (sim-only) ==================================
+       A simple gripper can't lift an object by friction in gz, so we WELD the
+       object to the gripper with a gz DetachableJoint when grasped. Publish Empty
+       on the attach topic to fix child_model to the gripper at their current
+       relative pose; publish detach to drop it. The scripts/grasp_helper.py node
+       fires these off the gripper joint closing/opening, so the manipulation SKILL
+       stays sim/real-agnostic (it just closes the gripper, as on the real robot).
+       child_model names match moz1_pickplace.world. Fortress 6.18 supports the
+       backported <attach_topic>. -->
+  <xacro:macro name="grasp_weld" params="side object">
+    <gazebo>
+      <plugin filename="ignition-gazebo-detachable-joint-system"
+              name="ignition::gazebo::systems::DetachableJoint">
+        <parent_link>${side}_gripper_base_link</parent_link>
+        <child_model>${object}</child_model>
+        <child_link>link</child_link>
+        <attach_topic>/grasp/${side}/attach</attach_topic>
+        <detach_topic>/grasp/${side}/detach</detach_topic>
+        <suppress_child_warning>true</suppress_child_warning>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+  <xacro:grasp_weld side="left"  object="bearing_ring"/>
+  <xacro:grasp_weld side="right" object="sample_bottle"/>
+
+  <!-- ============ Holonomic base + ground-truth odometry (gz-sim systems) =======
+       VelocityControl applies the /cmd_vel twist (vx, vy, wz) directly to the
+       model (mecanum kinematics; wheels are visual-only). OdometryPublisher emits
+       odom + odom->base_link TF. Both on GZ topics -> bridged to ROS in the launch. -->
+  <!-- Only when the base is FREE (fix_base:=false). With a fixed base these would
+       fight the world joint and the base wouldn't move anyway. -->
+  <xacro:unless value="$(arg fix_base)">
+  <gazebo>
+    <plugin filename="ignition-gazebo-velocity-control-system"
+            name="ignition::gazebo::systems::VelocityControl">
+      <topic>cmd_vel</topic>
+    </plugin>
+    <plugin filename="ignition-gazebo-odometry-publisher-system"
+            name="ignition::gazebo::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <odom_topic>odom</odom_topic>
+      <tf_topic>tf</tf_topic>
+      <dimensions>3</dimensions>
+    </plugin>
+  </gazebo>
+  </xacro:unless>
+
+  <!-- ============================ Sensors (gz-sim) ============================
+       gpu_lidar -> gz topic /livox/lidar (gz.msgs.PointCloudPacked); imu ->
+       /livox/imu (gz.msgs.IMU). Bridged to sensor_msgs in the launch. The world's
+       Sensors + Imu systems must be enabled (see the .world files). -->
+  <gazebo reference="livox_frame">
+    <xacro:if value="$(arg lidar)">
+    <sensor name="livox_lidar" type="gpu_lidar">
+      <topic>livox/lidar</topic>
+      <!-- report the cloud in `livox_frame` (the TF/real-robot contract) instead
+           of gz's scoped `moz1/base_link/livox_lidar`, so SLAM/Nav2 can transform it -->
+      <ignition_frame_id>livox_frame</ignition_frame_id>
+      <update_rate>10</update_rate>
+      <always_on>1</always_on>
+      <visualize>true</visualize>
+      <lidar>
+        <scan>
+          <horizontal><samples>360</samples><resolution>1</resolution><min_angle>-3.14159</min_angle><max_angle>3.14159</max_angle></horizontal>
+          <!-- 16 vertical rays (was 64): 2D nav flattens the cloud to a scan, so
+               dense vertical is wasted GPU. FOV 0°..+23° — HORIZONTAL AND UP ONLY.
+               A downward ray from this low (0.3 m) mount hits the FLOOR in a ring
+               ~2.6 m out; pointcloud_to_laserscan keeps the nearest return per
+               angle, so that floor ring beats the 3-6 m walls and SLAM maps a
+               DISC instead of the room. Keeping every ray >= horizontal removes
+               the floor return entirely (paired with the scan height-slab below).
+               (Real Mid360 is -7°..+52° and the real robot uses 3D FAST-LIO2 on the
+               full cloud; this is a SIM 2D-SLAM simplification.) -->
+          <vertical><samples>16</samples><resolution>1</resolution><min_angle>0.0</min_angle><max_angle>0.4</max_angle></vertical>
+        </scan>
+        <range><min>0.1</min><max>40.0</max><resolution>0.01</resolution></range>
+      </lidar>
+    </sensor>
+    </xacro:if>
+
+    <sensor name="livox_imu" type="imu">
+      <topic>livox/imu</topic>
+      <ignition_frame_id>livox_frame</ignition_frame_id>
+      <update_rate>200</update_rate>
+      <always_on>1</always_on>
+    </sensor>
+  </gazebo>
+
+</robot>

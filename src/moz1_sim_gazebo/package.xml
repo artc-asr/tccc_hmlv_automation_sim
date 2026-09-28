@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>moz1_sim_gazebo</name>
+  <version>0.2.0</version>
+  <description>
+    Gazebo Fortress (gz-sim, via ros_gz) simulation of the Moz1, presenting the
+    SAME ROS2 contract as the real robot and the Isaac sim (moz1_sim_ws):
+    /livox/lidar, /livox/imu, /odom, /joint_states, /cmd_vel, and MoveIt
+    FollowJointTrajectory controllers. A lighter-compute alternative to Isaac Sim;
+    the unchanged moz1_navigation_bringup / moz1_moveit_config drive it. Holonomic
+    base via the VelocityControl system; arms via ign_ros2_control; gz/ROS via
+    ros_gz_bridge. (Gazebo Classic is no longer supported, Fortress only.)
+  </description>
+  <maintainer email="asr.mobilemanipulation@gmail.com">Moz1 Sim</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Gazebo Fortress + ros_gz -->
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>ign_ros2_control</exec_depend>
+  <!-- ros2_control + description + launch -->
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
+  <!-- Shared with the real robot; reused verbatim (same workspace here,
+       an overlay in the full SpiritAI checkout). -->
+  <exec_depend>moz1_description</exec_depend>
+  <exec_depend>moz1_navigation_bringup</exec_depend>
+  <exec_depend>moz1_moveit_config</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

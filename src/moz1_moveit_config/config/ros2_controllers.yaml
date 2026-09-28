@@ -1,0 +1,79 @@
+# ros2_controllers.yaml - controllers spawned against the mock_components system
+# (demo.launch.py only). These drive the SIMULATED mock hardware; they never
+# touch the real robot. Real execution is a separate path (moz1_moveit_bridge).
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz (simulation clock)
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    left_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    right_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    # ⚠ Must exist here because moveit_controllers.yaml is SHARED with the real
+    # robot and now lists torso_controller (§12.22). Without it demo.launch.py
+    # starts MoveIt expecting a controller that was never spawned. Simulation is
+    # also the right place to try torso Cartesian goals first — no CoG model.
+    torso_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    left_gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    right_gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+left_arm_controller:
+  ros__parameters:
+    joints:
+      - LeftArm-0
+      - LeftArm-1
+      - LeftArm-2
+      - LeftArm-3
+      - LeftArm-4
+      - LeftArm-5
+      - LeftArm-6
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+right_arm_controller:
+  ros__parameters:
+    joints:
+      - RightArm-0
+      - RightArm-1
+      - RightArm-2
+      - RightArm-3
+      - RightArm-4
+      - RightArm-5
+      - RightArm-6
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+torso_controller:
+  ros__parameters:
+    joints:
+      - LegWaist-0
+      - LegWaist-1
+      - LegWaist-2
+      - LegWaist-3
+      - LegWaist-4
+      - LegWaist-5
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+left_gripper_controller:
+  ros__parameters:
+    joints: [left_gripper_joint]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+right_gripper_controller:
+  ros__parameters:
+    joints: [right_gripper_joint]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true

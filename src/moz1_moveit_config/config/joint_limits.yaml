@@ -1,0 +1,38 @@
+# joint_limits.yaml - authoritative velocity/acceleration limits for MoveIt
+# time-parameterization. Position limits come from the URDF.
+#
+# >>> PLACEHOLDER VELOCITIES/ACCELS - NOT official Moz1 spec. <<<
+# The CAD URDF had effort=velocity=0 (unset). These conservative values exist
+# only so trajectories can be timed; they are deliberately SLOW. Re-derive from
+# the SDK / datasheet before any real execution. (moz1_moveit_bridge enforces
+# its OWN, even tighter, limits on the real path.)
+default_velocity_scaling_factor: 0.1
+default_acceleration_scaling_factor: 0.1
+
+joint_limits:
+  # ---- left arm (7-DOF) ----
+  LeftArm-0: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  LeftArm-1: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  LeftArm-2: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  LeftArm-3: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  LeftArm-4: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  LeftArm-5: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  LeftArm-6: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  # ---- right arm (7-DOF) ----
+  RightArm-0: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  RightArm-1: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  RightArm-2: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  RightArm-3: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  RightArm-4: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  RightArm-5: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  RightArm-6: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 1.0}
+  # ---- torso (optional group) ----
+  LegWaist-0: {has_velocity_limits: true, max_velocity: 0.5, has_acceleration_limits: true, max_acceleration: 0.5}
+  LegWaist-1: {has_velocity_limits: true, max_velocity: 0.5, has_acceleration_limits: true, max_acceleration: 0.5}
+  LegWaist-2: {has_velocity_limits: true, max_velocity: 0.5, has_acceleration_limits: true, max_acceleration: 0.5}
+  LegWaist-3: {has_velocity_limits: true, max_velocity: 0.5, has_acceleration_limits: true, max_acceleration: 0.5}
+  LegWaist-4: {has_velocity_limits: true, max_velocity: 0.5, has_acceleration_limits: true, max_acceleration: 0.5}
+  LegWaist-5: {has_velocity_limits: true, max_velocity: 0.5, has_acceleration_limits: true, max_acceleration: 0.5}
+  # ---- PLACEHOLDER grippers (units UNVERIFIED) ----
+  left_gripper_joint:  {has_velocity_limits: true, max_velocity: 0.1, has_acceleration_limits: true, max_acceleration: 0.1}
+  right_gripper_joint: {has_velocity_limits: true, max_velocity: 0.1, has_acceleration_limits: true, max_acceleration: 0.1}

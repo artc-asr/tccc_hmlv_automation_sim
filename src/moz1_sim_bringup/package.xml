@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>moz1_sim_bringup</name>
+  <version>0.1.0</version>
+  <description>
+    Launch orchestration for driving the Moz1 Isaac Sim with the unchanged
+    real-robot Nav2/SLAM/MoveIt packages. Sets use_sim_time, starts the
+    moz1_sim_bridge glue, includes the real moz1_navigation_bringup and
+    moz1_moveit_config launches, and swaps MoveIt's mock_components hardware
+    for topic_based_ros2_control so move_group talks to Isaac over topics.
+  </description>
+  <maintainer email="asr.mobilemanipulation@gmail.com">Moz1 Sim</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>moz1_sim_bridge</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>topic_based_ros2_control</exec_depend>
+  <!-- Shared with the real robot; reused verbatim (same workspace here,
+       an overlay in the full SpiritAI checkout). -->
+  <exec_depend>moz1_description</exec_depend>
+  <exec_depend>moz1_navigation_bringup</exec_depend>
+  <exec_depend>moz1_moveit_config</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

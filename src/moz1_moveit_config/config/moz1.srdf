@@ -1,0 +1,1527 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ========================================================================
+     moz1.srdf - MoveIt2 semantic description for the Spirit AI Moz1.
+
+     Joint names are the REAL SDK-matching names (LeftArm-N / RightArm-N /
+     LegWaist-N). Grippers (*_gripper_joint) and the *_ee_link tips are
+     PLACEHOLDERS from moz1_description - see that package's warnings.
+
+     disable_collisions below is AUTO-GENERATED (not from the MoveIt Setup
+     Assistant): adjacent pairs, all rigid-body pairs, and arm-vs-body /
+     within-arm pairs are disabled; left-arm vs right-arm collisions are
+     LEFT ENABLED so dual-arm planning still checks the two arms against
+     each other. Regenerate if the URDF changes.
+     ===================================================================== -->
+<robot name="moz1">
+
+  <!-- ============================ GROUPS ============================ -->
+  <!-- 7-DOF arms. base_link is the shared torso top (waist03); the tip is the
+       GRIPPER TCP.
+
+       ⚠ The tip was `<side>_ee_link` until 2026-08-19. That link is the WRIST
+       (the gripper mount), so IK solved to the wrist and every Cartesian goal
+       landed ~140 mm short of the fingers. The tip is now the real grasp point,
+       `<side>_gripper_tcp_link`, which the gripper macro derives from the
+       fingertip meshes (verify_gripper.py re-derives it and fails on drift).
+
+       ⚠ Changing this ALSO moves the RViz interactive marker, but not via this
+       line — the marker is drawn at the END EFFECTOR's parent_link, so that had
+       to change too. Both are below; changing only one splits the marker from
+       the frame IK actually solves for, which looks like a calibration error.
+       Note the chain still contains exactly the 7 arm joints: everything past
+       LeftArm-6 is fixed. -->
+  <group name="left_arm">
+    <chain base_link="waist03" tip_link="left_gripper_tcp_link"/>
+  </group>
+  <group name="right_arm">
+    <chain base_link="waist03" tip_link="right_gripper_tcp_link"/>
+  </group>
+  <group name="dual_arm">
+    <group name="left_arm"/>
+    <group name="right_arm"/>
+  </group>
+
+  <!-- PLACEHOLDER single-DOF grippers (units UNVERIFIED). -->
+  <group name="left_gripper">
+    <joint name="left_gripper_joint"/>
+  </group>
+  <group name="right_gripper">
+    <joint name="right_gripper_joint"/>
+  </group>
+
+  <!-- OPTIONAL torso group (LegWaist-0..5). Not used in v1 planning demos;
+       provided for future whole-upper-body work. -->
+  <group name="torso">
+    <chain base_link="base_link" tip_link="waist03"/>
+  </group>
+
+  <!-- ========================= GROUP STATES ========================= -->
+  <!-- "home" mirrors robot.yaml home_pose_deg (the SDK reset pose). -->
+  <group_state name="home" group="left_arm">
+    <joint name="LeftArm-0" value="-0.1570796327"/>
+    <joint name="LeftArm-1" value="-0.872664626"/>
+    <joint name="LeftArm-2" value="-0.3490658504"/>
+    <joint name="LeftArm-3" value="-1.5707963268"/>
+    <joint name="LeftArm-4" value="-0.6108652381"/>
+    <joint name="LeftArm-5" value="0.1396263402"/>
+    <joint name="LeftArm-6" value="-0.1221730476"/>
+  </group_state>
+  <group_state name="zero" group="left_arm">
+    <joint name="LeftArm-0" value="0"/>
+    <joint name="LeftArm-1" value="0"/>
+    <joint name="LeftArm-2" value="0"/>
+    <joint name="LeftArm-3" value="0"/>
+    <joint name="LeftArm-4" value="0"/>
+    <joint name="LeftArm-5" value="0"/>
+    <joint name="LeftArm-6" value="0"/>
+  </group_state>
+  <group_state name="home" group="right_arm">
+    <joint name="RightArm-0" value="0.1570796327"/>
+    <joint name="RightArm-1" value="-0.872664626"/>
+    <joint name="RightArm-2" value="0.3490658504"/>
+    <joint name="RightArm-3" value="1.5707963268"/>
+    <joint name="RightArm-4" value="0.6108652381"/>
+    <joint name="RightArm-5" value="0.1396263402"/>
+    <joint name="RightArm-6" value="0.1221730476"/>
+  </group_state>
+  <group_state name="zero" group="right_arm">
+    <joint name="RightArm-0" value="0"/>
+    <joint name="RightArm-1" value="0"/>
+    <joint name="RightArm-2" value="0"/>
+    <joint name="RightArm-3" value="0"/>
+    <joint name="RightArm-4" value="0"/>
+    <joint name="RightArm-5" value="0"/>
+    <joint name="RightArm-6" value="0"/>
+  </group_state>
+  <group_state name="home" group="dual_arm">
+    <joint name="LeftArm-0" value="-0.1570796327"/>
+    <joint name="LeftArm-1" value="-0.872664626"/>
+    <joint name="LeftArm-2" value="-0.3490658504"/>
+    <joint name="LeftArm-3" value="-1.5707963268"/>
+    <joint name="LeftArm-4" value="-0.6108652381"/>
+    <joint name="LeftArm-5" value="0.1396263402"/>
+    <joint name="LeftArm-6" value="-0.1221730476"/>
+    <joint name="RightArm-0" value="0.1570796327"/>
+    <joint name="RightArm-1" value="-0.872664626"/>
+    <joint name="RightArm-2" value="0.3490658504"/>
+    <joint name="RightArm-3" value="1.5707963268"/>
+    <joint name="RightArm-4" value="0.6108652381"/>
+    <joint name="RightArm-5" value="0.1396263402"/>
+    <joint name="RightArm-6" value="0.1221730476"/>
+  </group_state>
+
+  <!-- Gripper poses. Stroke 0..0.12 m = SDK units (0.12 open, 0 closed),
+       confirmed against MovaX 2026-08-06. §12.17. -->
+  <!-- ==================== TORSO STATES (2026-08-08) ====================
+       "home" = [0, 60, -90, 30, 0, 0] deg — the robot's real standing pose,
+       CORRECTED 2026-08-08 by the operator.
+
+       ⚠ This deliberately does NOT match robot.yaml's old home_pose_deg.torso
+       of [30, 0, 0, 30, 0, 0]; that value was wrong and robot.yaml has been
+       corrected to agree with this one. Two independent signs it was wrong:
+         * the live robot measured [0, 60, -90, 30, 0, 0] deg;
+         * [30, ...] put LegWaist-0 EXACTLY on its URDF limit (+-30 deg, inside
+           by ~4e-10 rad) — a "home" pose sitting on a joint boundary, with the
+           limit numerically identical to the home value, was one being derived
+           from the other rather than either being measured.
+       The corrected values sit comfortably inside every limit, LegWaist-0
+       included. §12.22.
+
+       Because home is now the robot's resting pose, planning torso->home from
+       rest is a no-op and therefore safe. "zero" below is NOT. -->
+  <group_state name="home" group="torso">
+    <joint name="LegWaist-0" value="0"/>
+    <joint name="LegWaist-1" value="1.0471975512"/>
+    <joint name="LegWaist-2" value="-1.5707963268"/>
+    <joint name="LegWaist-3" value="0.5235987756"/>
+    <joint name="LegWaist-4" value="0"/>
+    <joint name="LegWaist-5" value="0"/>
+  </group_state>
+  <!-- 🔴 "zero" IS A LARGE MOTION — read before executing on the real robot.
+       From home it needs LegWaist-1 60->0 AND LegWaist-2 -90->0, i.e. fully
+       straightening a ~90 deg knee bend that carries the entire upper body,
+       plus LegWaist-3 30->0. Nothing like a 10 deg arm nudge:
+         * it sweeps the centre of gravity through its whole range, and there is
+           NO CoG or balance model anywhere in this stack;
+         * collision detection does not trigger on this robot (D1);
+         * at the torso's 0.1125 rad/s a 90 deg move takes ~14 s — ample time to
+           hit the e-stop. Use it.
+       Try it in demo.launch.py FIRST: mock hardware now starts at the corrected
+       home, so simulation shows the real path before hardware does. -->
+  <group_state name="zero" group="torso">
+    <joint name="LegWaist-0" value="0"/>
+    <joint name="LegWaist-1" value="0"/>
+    <joint name="LegWaist-2" value="0"/>
+    <joint name="LegWaist-3" value="0"/>
+    <joint name="LegWaist-4" value="0"/>
+    <joint name="LegWaist-5" value="0"/>
+  </group_state>
+
+  <group_state name="open" group="left_gripper">
+    <joint name="left_gripper_joint" value="0.12"/>
+  </group_state>
+  <group_state name="closed" group="left_gripper">
+    <joint name="left_gripper_joint" value="0.0"/>
+  </group_state>
+  <group_state name="open" group="right_gripper">
+    <joint name="right_gripper_joint" value="0.12"/>
+  </group_state>
+  <group_state name="closed" group="right_gripper">
+    <joint name="right_gripper_joint" value="0.0"/>
+  </group_state>
+
+  <!-- ======================== END EFFECTORS ======================== -->
+  <!-- ⚠ parent_link is WHERE THE INTERACTIVE MARKER IS DRAWN. MoveIt's
+       RobotInteraction places the 6-DOF marker at the end effector's
+       parent_link, not at the group's tip_link, so pointing only the chain at
+       the TCP leaves the marker behind at the wrist. Both must move together.
+       parent_link must also be a link of parent_group, which the TCP is,
+       because the chain above now ends there. -->
+  <end_effector name="left_ee"  parent_link="left_gripper_tcp_link"  group="left_gripper"  parent_group="left_arm"/>
+  <end_effector name="right_ee" parent_link="right_gripper_tcp_link" group="right_gripper" parent_group="right_arm"/>
+
+  <!-- ======================== VIRTUAL JOINT ======================== -->
+  <!-- Robot is fixed in the world for planning (mobile base is OUT of MoveIt v1). -->
+  <!-- ⚠ child_link MUST be the URDF ROOT, which is base_link (moz1.urdf.xacro:75,
+       changed 2026-06-10 so the nav stack can feed in via FAST-LIO2; base_footprint
+       became a CHILD of base_link). This said base_footprint until 2026-08-08 and
+       MoveIt silently skipped the whole joint:
+         "Skipping virtual joint 'virtual_joint' because its child frame
+          'base_footprint' does not match the URDF frame 'base_link'"
+       leaving 'world' unattached to the model. Combined with a static TF
+       world->base_footprint (two parents for one frame — robot_state_publisher
+       wins), tf split into two unconnected trees, and RViz with Fixed Frame=world
+       could not transform the EE interactive marker, so it reset every frame and
+       NO marker was ever drawn. Symptom looked like "marker too small". §12.20. -->
+  <virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="base_link"/>
+
+  <!-- ======================== PASSIVE JOINTS ======================= -->
+  <!-- Wheels are not actuated by MoveIt. -->
+  <passive_joint name="Base-0"/>
+  <passive_joint name="Base-1"/>
+  <passive_joint name="Base-2"/>
+  <passive_joint name="Base-3"/>
+
+  <!-- ====================== DISABLE COLLISIONS ===================== -->
+    <disable_collisions link1="base_footprint" link2="base_link" reason="Adjacent"/>
+    <disable_collisions link1="base_footprint" link2="head21" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="head22" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="head23" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="head_camera_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="head_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left01" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left02" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left03" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left04" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left05" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left06" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left07" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="leg01" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="leg02" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="leg03" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right01" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right02" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right03" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right04" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right05" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right06" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right07" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="waist01" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="waist02" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="waist03" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="base_link" link2="head21" reason="Never"/>
+    <disable_collisions link1="base_link" link2="head22" reason="Never"/>
+    <disable_collisions link1="base_link" link2="head23" reason="Never"/>
+    <disable_collisions link1="base_link" link2="head_camera_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="head_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left01" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left02" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left03" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left04" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left05" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left06" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left07" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="leg01" reason="Adjacent"/>
+    <disable_collisions link1="base_link" link2="leg02" reason="Never"/>
+    <disable_collisions link1="base_link" link2="leg03" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right01" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right02" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right03" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right04" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right05" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right06" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right07" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="waist01" reason="Never"/>
+    <disable_collisions link1="base_link" link2="waist02" reason="Never"/>
+    <disable_collisions link1="base_link" link2="waist03" reason="Never"/>
+    <disable_collisions link1="base_link" link2="wheel01" reason="Adjacent"/>
+    <disable_collisions link1="base_link" link2="wheel02" reason="Adjacent"/>
+    <disable_collisions link1="base_link" link2="wheel03" reason="Adjacent"/>
+    <disable_collisions link1="base_link" link2="wheel04" reason="Adjacent"/>
+    <disable_collisions link1="head21" link2="head22" reason="Adjacent"/>
+    <disable_collisions link1="head21" link2="head23" reason="Never"/>
+    <disable_collisions link1="head21" link2="head_camera_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="head_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left01" reason="Never"/>
+    <disable_collisions link1="head21" link2="left02" reason="Never"/>
+    <disable_collisions link1="head21" link2="left03" reason="Never"/>
+    <disable_collisions link1="head21" link2="left04" reason="Never"/>
+    <disable_collisions link1="head21" link2="left05" reason="Never"/>
+    <disable_collisions link1="head21" link2="left06" reason="Never"/>
+    <disable_collisions link1="head21" link2="left07" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="leg01" reason="Never"/>
+    <disable_collisions link1="head21" link2="leg02" reason="Never"/>
+    <disable_collisions link1="head21" link2="leg03" reason="Never"/>
+    <disable_collisions link1="head21" link2="right01" reason="Never"/>
+    <disable_collisions link1="head21" link2="right02" reason="Never"/>
+    <disable_collisions link1="head21" link2="right03" reason="Never"/>
+    <disable_collisions link1="head21" link2="right04" reason="Never"/>
+    <disable_collisions link1="head21" link2="right05" reason="Never"/>
+    <disable_collisions link1="head21" link2="right06" reason="Never"/>
+    <disable_collisions link1="head21" link2="right07" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="waist01" reason="Never"/>
+    <disable_collisions link1="head21" link2="waist02" reason="Never"/>
+    <disable_collisions link1="head21" link2="waist03" reason="Adjacent"/>
+    <disable_collisions link1="head21" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="head21" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="head21" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="head21" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="head22" link2="head23" reason="Adjacent"/>
+    <disable_collisions link1="head22" link2="head_camera_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="head_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left01" reason="Never"/>
+    <disable_collisions link1="head22" link2="left02" reason="Never"/>
+    <disable_collisions link1="head22" link2="left03" reason="Never"/>
+    <disable_collisions link1="head22" link2="left04" reason="Never"/>
+    <disable_collisions link1="head22" link2="left05" reason="Never"/>
+    <disable_collisions link1="head22" link2="left06" reason="Never"/>
+    <disable_collisions link1="head22" link2="left07" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="leg01" reason="Never"/>
+    <disable_collisions link1="head22" link2="leg02" reason="Never"/>
+    <disable_collisions link1="head22" link2="leg03" reason="Never"/>
+    <disable_collisions link1="head22" link2="right01" reason="Never"/>
+    <disable_collisions link1="head22" link2="right02" reason="Never"/>
+    <disable_collisions link1="head22" link2="right03" reason="Never"/>
+    <disable_collisions link1="head22" link2="right04" reason="Never"/>
+    <disable_collisions link1="head22" link2="right05" reason="Never"/>
+    <disable_collisions link1="head22" link2="right06" reason="Never"/>
+    <disable_collisions link1="head22" link2="right07" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="waist01" reason="Never"/>
+    <disable_collisions link1="head22" link2="waist02" reason="Never"/>
+    <disable_collisions link1="head22" link2="waist03" reason="Never"/>
+    <disable_collisions link1="head22" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="head22" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="head22" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="head22" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="head23" link2="head_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="head23" link2="head_link" reason="Adjacent"/>
+    <disable_collisions link1="head23" link2="left01" reason="Never"/>
+    <disable_collisions link1="head23" link2="left02" reason="Never"/>
+    <disable_collisions link1="head23" link2="left03" reason="Never"/>
+    <disable_collisions link1="head23" link2="left04" reason="Never"/>
+    <disable_collisions link1="head23" link2="left05" reason="Never"/>
+    <disable_collisions link1="head23" link2="left06" reason="Never"/>
+    <disable_collisions link1="head23" link2="left07" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="leg01" reason="Never"/>
+    <disable_collisions link1="head23" link2="leg02" reason="Never"/>
+    <disable_collisions link1="head23" link2="leg03" reason="Never"/>
+    <disable_collisions link1="head23" link2="right01" reason="Never"/>
+    <disable_collisions link1="head23" link2="right02" reason="Never"/>
+    <disable_collisions link1="head23" link2="right03" reason="Never"/>
+    <disable_collisions link1="head23" link2="right04" reason="Never"/>
+    <disable_collisions link1="head23" link2="right05" reason="Never"/>
+    <disable_collisions link1="head23" link2="right06" reason="Never"/>
+    <disable_collisions link1="head23" link2="right07" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="waist01" reason="Never"/>
+    <disable_collisions link1="head23" link2="waist02" reason="Never"/>
+    <disable_collisions link1="head23" link2="waist03" reason="Never"/>
+    <disable_collisions link1="head23" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="head23" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="head23" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="head23" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="head_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left01" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left02" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left03" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left04" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left05" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left06" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left07" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="leg01" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="leg02" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="leg03" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right01" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right02" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right03" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right04" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right05" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right06" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right07" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="waist01" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="waist02" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="waist03" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left01" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left02" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left03" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left04" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left05" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left06" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left07" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="leg01" reason="Never"/>
+    <disable_collisions link1="head_link" link2="leg02" reason="Never"/>
+    <disable_collisions link1="head_link" link2="leg03" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right01" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right02" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right03" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right04" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right05" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right06" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right07" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="waist01" reason="Never"/>
+    <disable_collisions link1="head_link" link2="waist02" reason="Never"/>
+    <disable_collisions link1="head_link" link2="waist03" reason="Never"/>
+    <disable_collisions link1="head_link" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="head_link" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="head_link" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="head_link" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="left01" link2="left02" reason="Adjacent"/>
+    <disable_collisions link1="left01" link2="left03" reason="Never"/>
+    <disable_collisions link1="left01" link2="left04" reason="Never"/>
+    <disable_collisions link1="left01" link2="left05" reason="Never"/>
+    <disable_collisions link1="left01" link2="left06" reason="Never"/>
+    <disable_collisions link1="left01" link2="left07" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="leg01" reason="Never"/>
+    <disable_collisions link1="left01" link2="leg02" reason="Never"/>
+    <disable_collisions link1="left01" link2="leg03" reason="Never"/>
+    <disable_collisions link1="left01" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="waist01" reason="Never"/>
+    <disable_collisions link1="left01" link2="waist02" reason="Never"/>
+    <disable_collisions link1="left01" link2="waist03" reason="Adjacent"/>
+    <disable_collisions link1="left01" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="left01" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="left01" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="left01" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="left02" link2="left03" reason="Adjacent"/>
+    <disable_collisions link1="left02" link2="left04" reason="Never"/>
+    <disable_collisions link1="left02" link2="left05" reason="Never"/>
+    <disable_collisions link1="left02" link2="left06" reason="Never"/>
+    <disable_collisions link1="left02" link2="left07" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="leg01" reason="Never"/>
+    <disable_collisions link1="left02" link2="leg02" reason="Never"/>
+    <disable_collisions link1="left02" link2="leg03" reason="Never"/>
+    <disable_collisions link1="left02" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="waist01" reason="Never"/>
+    <disable_collisions link1="left02" link2="waist02" reason="Never"/>
+    <disable_collisions link1="left02" link2="waist03" reason="Never"/>
+    <disable_collisions link1="left02" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="left02" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="left02" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="left02" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="left03" link2="left04" reason="Adjacent"/>
+    <disable_collisions link1="left03" link2="left05" reason="Never"/>
+    <disable_collisions link1="left03" link2="left06" reason="Never"/>
+    <disable_collisions link1="left03" link2="left07" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="leg01" reason="Never"/>
+    <disable_collisions link1="left03" link2="leg02" reason="Never"/>
+    <disable_collisions link1="left03" link2="leg03" reason="Never"/>
+    <disable_collisions link1="left03" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="waist01" reason="Never"/>
+    <disable_collisions link1="left03" link2="waist02" reason="Never"/>
+    <disable_collisions link1="left03" link2="waist03" reason="Never"/>
+    <disable_collisions link1="left03" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="left03" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="left03" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="left03" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="left04" link2="left05" reason="Adjacent"/>
+    <disable_collisions link1="left04" link2="left06" reason="Never"/>
+    <disable_collisions link1="left04" link2="left07" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="leg01" reason="Never"/>
+    <disable_collisions link1="left04" link2="leg02" reason="Never"/>
+    <disable_collisions link1="left04" link2="leg03" reason="Never"/>
+    <disable_collisions link1="left04" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="waist01" reason="Never"/>
+    <disable_collisions link1="left04" link2="waist02" reason="Never"/>
+    <disable_collisions link1="left04" link2="waist03" reason="Never"/>
+    <disable_collisions link1="left04" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="left04" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="left04" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="left04" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="left05" link2="left06" reason="Adjacent"/>
+    <disable_collisions link1="left05" link2="left07" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="leg01" reason="Never"/>
+    <disable_collisions link1="left05" link2="leg02" reason="Never"/>
+    <disable_collisions link1="left05" link2="leg03" reason="Never"/>
+    <disable_collisions link1="left05" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="waist01" reason="Never"/>
+    <disable_collisions link1="left05" link2="waist02" reason="Never"/>
+    <disable_collisions link1="left05" link2="waist03" reason="Never"/>
+    <disable_collisions link1="left05" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="left05" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="left05" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="left05" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="left06" link2="left07" reason="Adjacent"/>
+    <disable_collisions link1="left06" link2="left_ee_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="leg01" reason="Never"/>
+    <disable_collisions link1="left06" link2="leg02" reason="Never"/>
+    <disable_collisions link1="left06" link2="leg03" reason="Never"/>
+    <disable_collisions link1="left06" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="waist01" reason="Never"/>
+    <disable_collisions link1="left06" link2="waist02" reason="Never"/>
+    <disable_collisions link1="left06" link2="waist03" reason="Never"/>
+    <disable_collisions link1="left06" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="left06" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="left06" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="left06" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_ee_link" reason="Adjacent"/>
+    <disable_collisions link1="left07" link2="left_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="leg01" reason="Never"/>
+    <disable_collisions link1="left07" link2="leg02" reason="Never"/>
+    <disable_collisions link1="left07" link2="leg03" reason="Never"/>
+    <disable_collisions link1="left07" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="waist01" reason="Never"/>
+    <disable_collisions link1="left07" link2="waist02" reason="Never"/>
+    <disable_collisions link1="left07" link2="waist03" reason="Never"/>
+    <disable_collisions link1="left07" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="left07" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="left07" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="left07" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_gripper_base_link" reason="Adjacent"/>
+    <disable_collisions link1="left_ee_link" link2="leg01" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="leg02" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="leg03" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="waist01" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="waist02" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="waist03" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="leg01" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="leg02" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="leg03" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="waist01" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="waist02" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="waist03" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="leg01" link2="leg02" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="leg03" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right01" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right02" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right03" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right04" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right05" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right06" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right07" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="waist01" reason="Never"/>
+    <disable_collisions link1="leg01" link2="waist02" reason="Never"/>
+    <disable_collisions link1="leg01" link2="waist03" reason="Never"/>
+    <disable_collisions link1="leg01" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="leg01" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="leg01" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="leg01" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="leg02" link2="leg03" reason="Adjacent"/>
+    <disable_collisions link1="leg02" link2="right01" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right02" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right03" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right04" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right05" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right06" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right07" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="waist01" reason="Never"/>
+    <disable_collisions link1="leg02" link2="waist02" reason="Never"/>
+    <disable_collisions link1="leg02" link2="waist03" reason="Never"/>
+    <disable_collisions link1="leg02" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="leg02" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="leg02" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="leg02" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right01" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right02" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right03" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right04" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right05" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right06" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right07" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="waist01" reason="Adjacent"/>
+    <disable_collisions link1="leg03" link2="waist02" reason="Never"/>
+    <disable_collisions link1="leg03" link2="waist03" reason="Never"/>
+    <disable_collisions link1="leg03" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="leg03" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="leg03" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="leg03" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="right01" link2="right02" reason="Adjacent"/>
+    <disable_collisions link1="right01" link2="right03" reason="Never"/>
+    <disable_collisions link1="right01" link2="right04" reason="Never"/>
+    <disable_collisions link1="right01" link2="right05" reason="Never"/>
+    <disable_collisions link1="right01" link2="right06" reason="Never"/>
+    <disable_collisions link1="right01" link2="right07" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="waist01" reason="Never"/>
+    <disable_collisions link1="right01" link2="waist02" reason="Never"/>
+    <disable_collisions link1="right01" link2="waist03" reason="Adjacent"/>
+    <disable_collisions link1="right01" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="right01" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="right01" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="right01" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="right02" link2="right03" reason="Adjacent"/>
+    <disable_collisions link1="right02" link2="right04" reason="Never"/>
+    <disable_collisions link1="right02" link2="right05" reason="Never"/>
+    <disable_collisions link1="right02" link2="right06" reason="Never"/>
+    <disable_collisions link1="right02" link2="right07" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="waist01" reason="Never"/>
+    <disable_collisions link1="right02" link2="waist02" reason="Never"/>
+    <disable_collisions link1="right02" link2="waist03" reason="Never"/>
+    <disable_collisions link1="right02" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="right02" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="right02" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="right02" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="right03" link2="right04" reason="Adjacent"/>
+    <disable_collisions link1="right03" link2="right05" reason="Never"/>
+    <disable_collisions link1="right03" link2="right06" reason="Never"/>
+    <disable_collisions link1="right03" link2="right07" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="waist01" reason="Never"/>
+    <disable_collisions link1="right03" link2="waist02" reason="Never"/>
+    <disable_collisions link1="right03" link2="waist03" reason="Never"/>
+    <disable_collisions link1="right03" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="right03" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="right03" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="right03" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="right04" link2="right05" reason="Adjacent"/>
+    <disable_collisions link1="right04" link2="right06" reason="Never"/>
+    <disable_collisions link1="right04" link2="right07" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="waist01" reason="Never"/>
+    <disable_collisions link1="right04" link2="waist02" reason="Never"/>
+    <disable_collisions link1="right04" link2="waist03" reason="Never"/>
+    <disable_collisions link1="right04" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="right04" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="right04" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="right04" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="right05" link2="right06" reason="Adjacent"/>
+    <disable_collisions link1="right05" link2="right07" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="waist01" reason="Never"/>
+    <disable_collisions link1="right05" link2="waist02" reason="Never"/>
+    <disable_collisions link1="right05" link2="waist03" reason="Never"/>
+    <disable_collisions link1="right05" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="right05" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="right05" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="right05" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="right06" link2="right07" reason="Adjacent"/>
+    <disable_collisions link1="right06" link2="right_ee_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="waist01" reason="Never"/>
+    <disable_collisions link1="right06" link2="waist02" reason="Never"/>
+    <disable_collisions link1="right06" link2="waist03" reason="Never"/>
+    <disable_collisions link1="right06" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="right06" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="right06" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="right06" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_ee_link" reason="Adjacent"/>
+    <disable_collisions link1="right07" link2="right_gripper_base_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="waist01" reason="Never"/>
+    <disable_collisions link1="right07" link2="waist02" reason="Never"/>
+    <disable_collisions link1="right07" link2="waist03" reason="Never"/>
+    <disable_collisions link1="right07" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="right07" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="right07" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="right07" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_gripper_base_link" reason="Adjacent"/>
+    <disable_collisions link1="right_ee_link" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="waist01" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="waist02" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="waist03" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="torso_camera_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="waist01" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="waist02" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="waist03" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="torso_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="waist01" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="waist02" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="waist03" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="waist01" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="waist02" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="waist03" reason="Adjacent"/>
+    <disable_collisions link1="torso_link" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="waist01" link2="waist02" reason="Adjacent"/>
+    <disable_collisions link1="waist01" link2="waist03" reason="Never"/>
+    <disable_collisions link1="waist01" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="waist01" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="waist01" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="waist01" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="waist02" link2="waist03" reason="Adjacent"/>
+    <disable_collisions link1="waist02" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="waist02" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="waist02" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="waist02" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="waist03" link2="wheel01" reason="Never"/>
+    <disable_collisions link1="waist03" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="waist03" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="waist03" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="wheel02" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="wheel03" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="wheel04" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="wheel04" reason="Never"/>
+
+
+    <!-- ===== real linkage gripper (scripts/update_gripper_srdf.py) =====
+         Pairs inherited from the retired *_gripper_finger_link so planning
+         behaviour is preserved, plus all intra-gripper pairs (a 1-DOF
+         linkage in contact by design cannot meaningfully self-collide).
+         Regenerate with the MoveIt Setup Assistant for a fresh analysis:
+         the real gripper is far larger than the placeholder box. -->
+    <disable_collisions link1="base_footprint" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_narrow1_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_narrow2_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_narrow3_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_narrow_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="left_gripper_narrow2_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="left_gripper_narrow3_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="left_gripper_narrow_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="left_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="left_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="left_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="left_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow2_link" link2="left_gripper_narrow3_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow2_link" link2="left_gripper_narrow_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow2_link" link2="left_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow2_link" link2="left_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow2_link" link2="left_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow2_link" link2="left_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow3_link" link2="left_gripper_narrow_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow3_link" link2="left_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow3_link" link2="left_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow3_link" link2="left_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow3_link" link2="left_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow_loop_link" link2="left_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow_loop_link" link2="left_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow_loop_link" link2="left_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow_loop_link" link2="left_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide1_link" link2="left_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide1_link" link2="left_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide1_link" link2="left_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide2_link" link2="left_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide2_link" link2="left_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide3_link" link2="left_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="base_footprint" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_gripper_narrow1_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_gripper_narrow1_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_gripper_narrow2_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_gripper_narrow2_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_gripper_narrow3_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_gripper_narrow3_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_gripper_narrow_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_gripper_narrow_loop_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_gripper_wide1_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_gripper_wide2_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_gripper_wide3_link" reason="Never"/>
+    <disable_collisions link1="base_footprint" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_gripper_wide_loop_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="right_gripper_narrow2_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="right_gripper_narrow3_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="right_gripper_narrow_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="right_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="right_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="right_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="right_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow2_link" link2="right_gripper_narrow3_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow2_link" link2="right_gripper_narrow_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow2_link" link2="right_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow2_link" link2="right_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow2_link" link2="right_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow2_link" link2="right_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow3_link" link2="right_gripper_narrow_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow3_link" link2="right_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow3_link" link2="right_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow3_link" link2="right_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow3_link" link2="right_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow_loop_link" link2="right_gripper_wide1_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow_loop_link" link2="right_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow_loop_link" link2="right_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow_loop_link" link2="right_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide1_link" link2="right_gripper_wide2_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide1_link" link2="right_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide1_link" link2="right_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide2_link" link2="right_gripper_wide3_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide2_link" link2="right_gripper_wide_loop_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide3_link" link2="right_gripper_wide_loop_link" reason="Adjacent"/>
+
+
+    <!-- ===== wrist cameras (scripts/update_wrist_camera_srdf.py) =====
+         Pairs inherited from *_gripper_base_link, which the bracket clamps
+         onto and the camera bolts to, plus the pairs within the assembly
+         itself (all three are in permanent contact by construction).
+         Without these MoveIt sees a self-collision in EVERY arm state.
+         Left-vs-right is deliberately NOT excluded, matching the gripper.
+         Regenerate with the MoveIt Setup Assistant for a fresh analysis:
+         the camera reaches ~7 cm off the axis the bare gripper occupies. -->
+    <disable_collisions link1="base_footprint" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow2_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow3_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow_loop_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide1_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide2_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide3_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide_loop_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="base_footprint" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="left01" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="left02" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="left03" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="left04" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="left05" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="left06" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="left07" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="leg01" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="left_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow2_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow3_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow_loop_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide1_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide2_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide3_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_wide_loop_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_base_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="left_wrist_camera_mount_link" link2="left_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="base_footprint" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_wrist_camera_mount_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow2_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow3_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow_loop_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide1_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide2_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide3_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide_loop_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="base_footprint" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="base_link" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head21" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head22" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head23" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="head_link" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="leg01" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="leg02" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="leg03" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="right01" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="right02" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="right03" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="right04" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="right05" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="right06" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="right07" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="torso_camera_link" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="waist01" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="waist02" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="waist03" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="wheel02" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="wheel03" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="wheel04" link2="right_wrist_camera_link" reason="Never"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow2_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow3_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_narrow_loop_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide1_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide2_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide3_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_wide_loop_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_wrist_camera_mount_link" reason="Adjacent"/>
+    <disable_collisions link1="right_gripper_base_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+    <disable_collisions link1="right_wrist_camera_mount_link" link2="right_wrist_camera_link" reason="Adjacent"/>
+
+
+    <!-- ===== chassis geometry (see scripts/check_srdf_links.py) =====
+         `base_link` used to carry base_link.STL. It is now a PURE FRAME and the
+         mesh hangs off `moz1_chassis`, which is rotated by visual_yaw so the nav
+         stack keeps a MOZ1-convention base_link (moz1.urdf.xacro:93). The matrix
+         was generated before that split, so every base_link pair below refers to
+         an empty link while the real chassis geometry — parent of all four wheels
+         and leg01 — had NO entry at all. Inherited here so planning behaviour is
+         preserved. base_link's own pairs are kept: harmless, and correct again if
+         it is ever given geometry back. -->
+    <disable_collisions link1="base_footprint" link2="moz1_chassis" reason="Adjacent"/>
+    <disable_collisions link1="head21" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="head22" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="head23" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="head_camera_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="head_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left01" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left02" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left03" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left04" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left05" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left06" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left07" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_ee_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_gripper_base_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="leg01" link2="moz1_chassis" reason="Adjacent"/>
+    <disable_collisions link1="leg02" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="leg03" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right01" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right02" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right03" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right04" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right05" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right06" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right07" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_ee_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_gripper_base_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="torso_camera_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="torso_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="waist01" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="waist02" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="waist03" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="wheel01" link2="moz1_chassis" reason="Adjacent"/>
+    <disable_collisions link1="wheel02" link2="moz1_chassis" reason="Adjacent"/>
+    <disable_collisions link1="wheel03" link2="moz1_chassis" reason="Adjacent"/>
+    <disable_collisions link1="wheel04" link2="moz1_chassis" reason="Adjacent"/>
+    <disable_collisions link1="left_gripper_narrow1_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_gripper_narrow2_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_gripper_narrow3_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_gripper_narrow_loop_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_gripper_wide1_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_gripper_wide2_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_gripper_wide3_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_gripper_wide_loop_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_gripper_narrow1_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_gripper_narrow2_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_gripper_narrow3_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_gripper_narrow_loop_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_gripper_wide1_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_gripper_wide2_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_gripper_wide3_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_gripper_wide_loop_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_wrist_camera_mount_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="left_wrist_camera_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_wrist_camera_mount_link" link2="moz1_chassis" reason="Never"/>
+    <disable_collisions link1="right_wrist_camera_link" link2="moz1_chassis" reason="Never"/>
+
+</robot>

@@ -1,0 +1,117 @@
+<?xml version="1.0"?>
+<!--
+  moz1_cameras.xacro
+
+  Three RGB-D camera sensors: head ("cam_high") and both wrists
+  ("cam_left_wrist", "cam_right_wrist"), matching the mount points implied
+  by the real Moz1 hardware and the SDK's observation keys.
+
+  Include this from moz1_gazebo_additions.xml (or directly from your main
+  gazebo xacro) with:
+    <xacro:include filename="$(find moz1_description)/urdf/moz1_cameras.xacro"/>
+
+  Mount links used (defined by moz1_description, NOT here):
+    head_camera_link        - head camera mount
+    left_wrist_camera_link  - left-arm wrist camera mount
+    right_wrist_camera_link - right-arm wrist camera mount
+
+  These replaced the earlier head23/left07/right07 guesses: the mount offsets
+  now live in moz1_description, so this file leaves the sensor pose at zero and
+  only adds the optical-convention frames and the Gazebo sensors. That means
+  this xacro does NOT stand alone - without that overlay the parent links do not
+  exist and the camera frames attach to nothing.
+
+  D455 (head) / D405 (wrist) FOV/resolution values below are from Intel's
+  public RealSense datasheets as a reasonable starting point - worth
+  double-checking against the exact SKU if precision matters later.
+-->
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- wrist_cameras: the two eye-in-hand D405s are heavy (2 more RGB-D renders)
+       and not needed for navigation/manipulation, where they drag the sim RTF on
+       a PRIME laptop. OFF by default; enable with wrist_cameras:=true for
+       perception work. The head cam (cam_high) is always on. -->
+  <xacro:arg name="wrist_cameras" default="false"/>
+  <!-- ============================ HEAD CAMERA (D455) ============================ -->
+  <link name="cam_high_optical_frame"/>
+  <joint name="cam_high_optical_joint" type="fixed">
+    <parent link="head_camera_link"/>
+    <child link="cam_high_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-1.5707963 0 -1.5707963"/>
+  </joint>
+
+  <gazebo reference="head_camera_link">
+    <sensor name="cam_high" type="rgbd_camera">
+      <!-- pose left at zero - the offset now lives in head_camera_link in SpiritAi -->
+      <topic>cam_high</topic>
+      <update_rate>5</update_rate>
+      <camera>
+        <horizontal_fov>1.5184</horizontal_fov>  <!-- ~87 deg, D455 RGB -->
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>10.0</far>
+        </clip>
+        <!-- ties the published frame_id to the optical-convention frame -->
+        <optical_frame_id>cam_high_optical_frame</optical_frame_id>
+      </camera>
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+    </sensor>
+  </gazebo>
+ 
+ <!-- ============================ WRIST CAMERA XACRO (D405) ============================ -->
+  <xacro:macro name="moz1_gz_wrist_camera" params="side">
+
+    <link name="cam_${side}_wrist_link"/>
+    <joint name="cam_${side}_wrist_joint" type="fixed">
+      <parent link="${side}_wrist_camera_link"/>
+      <child link="cam_${side}_wrist_link"/>
+      <!-- TODO: real offset from right07 origin to the D405's actual lens position -->
+      <origin xyz="-0.01 0.03 0.0" rpy="0 0 ${pi/2}"/>
+      <!-- <origin xyz="0.0 0.0 0.0" rpy="-1.5707963 1.5707963 -1.5707963"/> -->
+    </joint>
+
+    <link name="cam_${side}_wrist_optical_frame"/>
+    <joint name="cam_${side}_wrist_optical_joint" type="fixed">
+      <parent link="${side}_wrist_camera_link"/>
+      <child link="cam_${side}_wrist_optical_frame"/>
+      <origin xyz="-0.01 0.03 0.0" rpy="-1.5707963 0 -1.5707963"/>
+    </joint>
+
+    <gazebo reference="cam_${side}_wrist_link">
+      <sensor name="cam_${side}_wrist" type="rgbd_camera">
+        <topic>cam_${side}_wrist</topic>
+        <update_rate>30</update_rate>
+        <camera>
+          <horizontal_fov>1.5184</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.02</near>
+            <far>10.0</far>
+          </clip>
+          <optical_frame_id>cam_${side}_wrist_optical_frame</optical_frame_id>
+        </camera>
+        <always_on>true</always_on>
+        <visualize>true</visualize>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- Instantiated only when wrist_cameras:=true - the macro body above is just
+       a definition, so the two D405 renders cost nothing until these run. -->
+  <xacro:if value="$(arg wrist_cameras)">
+    <xacro:moz1_gz_wrist_camera side="left"/>
+    <xacro:moz1_gz_wrist_camera side="right"/>
+  </xacro:if>
+
+</robot>
+

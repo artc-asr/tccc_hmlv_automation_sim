@@ -1,0 +1,380 @@
+<?xml version="1.0"?>
+<!-- ========================================================================
+     moz1.urdf.xacro - simplified-but-faithful Moz1 description for RViz/MoveIt.
+
+     Provenance:
+       * The torso + arm geometry, joint axes and joint limits are taken
+         VERBATIM from the official CAD export spirit01_model/urdf/moz1.urdf.
+         Joint names (Base-N, LegWaist-N, LeftArm-N, RightArm-N, Head-N) are
+         the REAL SDK-matching names, NOT invented placeholders.
+       * Grippers, the *_ee_link tips, the semantic alias frames (torso_link,
+         head_link) and the sensor frames (livox_frame, *_camera_link) are
+         PLACEHOLDERS added on top - they are clearly marked and easy to edit.
+
+     >>> VERIFY-BEFORE-HARDWARE (search "VERIFY" / "TODO" / "PLACEHOLDER") <<<
+       Joint names, joint axes, link dimensions and gripper units must all be
+       re-confirmed against the live SDK before any real-robot execution.
+     ===================================================================== -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="moz1">
+
+  <xacro:include filename="$(find moz1_description)/urdf/materials.xacro"/>
+  <xacro:include filename="$(find moz1_description)/urdf/moz1_arm_macros.xacro"/>
+  <xacro:include filename="$(find moz1_description)/urdf/moz1_gripper_macros.xacro"/>
+  <xacro:include filename="$(find moz1_description)/urdf/moz1_wrist_camera_macros.xacro"/>
+
+  <!-- ====================================================================
+       Tunable placeholders (NOT official) - change here, nowhere else.
+       ==================================================================== -->
+  <!-- base_footprint is the ground-projected root. Offset below base_link is a
+       PLACEHOLDER (wheel radius not in CAD). 0 keeps base_link at CAD origin. -->
+  <xacro:property name="base_footprint_z" value="0.0"/>
+
+  <!-- visual_yaw: yaw rotation (rad) applied ONLY to the visual chassis +
+       kinematic subtree, NOT to base_link itself. base_link's frame stays
+       defined by the nav stack (FAST-LIO2 body->base_link, MOZ1 convention
+       +X=left, -Y=forward). Use this to align the URDF mesh's "natural
+       front" with how the rest of the world expects the robot to face.
+       Default 1.5708 (+90 deg CCW) was chosen empirically: the CAD export
+       has its mesh facing the URDF's +Y, so a +90 yaw aligns mesh-front
+       with +X (the conventional "red arrow forward" in RViz).
+       Override at launch with: xacro ... visual_yaw:=0.0 to disable. -->
+  <xacro:arg name="visual_yaw" default="1.5707963267948966"/>
+  <xacro:property name="visual_yaw" value="$(arg visual_yaw)"/>
+
+  <!-- helper: a zero-mass visual mesh link (matches CAD body parts).
+       mesh defaults to "<name>.STL"; override for links that share a mesh
+       (e.g. all four wheels use wheel.STL). -->
+  <xacro:macro name="mesh_link" params="name material:='moz1_grey' mesh:='' mass:=0.5 ixx:=0.001 iyy:=0.001 izz:=0.001">
+    <xacro:property name="mesh_file" value="${mesh if mesh else name + '.STL'}"/>
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><mesh filename="package://moz1_description/meshes/${mesh_file}"/></geometry>
+        <material name="${material}"/>
+      </visual>
+      <!-- placeholder inertial (physics-only) so Gazebo keeps the link+joint;
+           ignored by MoveIt planning. Override mass/ixx/iyy/izz per link (e.g.
+           the chassis) to stop the base tipping over in sim. -->
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${mass}"/>
+        <inertia ixx="${ixx}" ixy="0" ixz="0" iyy="${iyy}" iyz="0" izz="${izz}"/>
+      </inertial>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><mesh filename="package://moz1_description/meshes/${mesh_file}"/></geometry>
+      </collision>
+    </link>
+  </xacro:macro>
+
+  <!-- helper: a tiny visual-only frame marker (for sensor/semantic frames) -->
+  <xacro:macro name="frame_marker" params="name material:='moz1_sensor' size:=0.03">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${size} ${size} ${size}"/></geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+  </xacro:macro>
+
+  <!-- ====================================================================
+       MOBILE BASE  (CAD-faithful)
+       ==================================================================== -->
+  <!-- base_link is the ROOT (was base_footprint pre-2026-06-10).
+       Reason: the nav stack feeds in via FAST-LIO2's body to base_link
+       static TF, so base_link must have at most one parent in the URDF.
+       Making it the root keeps the nav-side chain
+       (map then odom then camera_init then body then base_link) intact
+       while the URDF still publishes base_footprint as a child (negative z
+       so it sits at the ground projection below the chassis). MoveIt v1
+       only cares about the torso/arm chain, so this inversion is
+       transparent to the manip workflow. -->
+  <!-- base_link is now a pure frame marker (NO mesh). The chassis mesh +
+       all wheel/leg/arm/head visuals hang off moz1_chassis below, which is
+       rotated by visual_yaw relative to base_link. This way the nav stack
+       (which uses base_link) sees the MOZ1-convention frame untouched,
+       while the URDF's mesh assembly visually rotates as one piece. -->
+  <link name="base_link"/>
+
+  <xacro:mesh_link name="moz1_chassis" mesh="base_link.STL" mass="40.0" ixx="1.0" iyy="1.0" izz="1.0"/>
+  <joint name="moz1_chassis_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 ${visual_yaw}"/>
+    <parent link="base_link"/>
+    <child  link="moz1_chassis"/>
+  </joint>
+
+  <!-- base_footprint stays attached to base_link (not the rotated chassis):
+       it's a nav-frame marker on the ground; rotating it would only confuse
+       things and Nav2 uses base_link as the costmap base anyway. -->
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <!-- TODO(hardware): set true wheel-radius offset; 0 = base_link at CAD origin -->
+    <origin xyz="0 0 -${base_footprint_z}" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child  link="base_footprint"/>
+  </joint>
+
+  <!-- Four omni/mecanum wheels (continuous). Kept for visual fidelity; not in
+       any MoveIt group - the mobile base is intentionally OUT of MoveIt v1. -->
+  <xacro:mesh_link name="wheel01" mesh="wheel.STL"/>
+  <joint name="Base-0" type="continuous">
+    <origin xyz="0.2423 0.2423 0" rpy="0 0 2.35619449"/>
+    <parent link="moz1_chassis"/><child link="wheel01"/><axis xyz="0 1 0"/>
+  </joint>
+  <xacro:mesh_link name="wheel02" mesh="wheel.STL"/>
+  <joint name="Base-1" type="continuous">
+    <origin xyz="-0.2423 0.2423 0" rpy="0 0 -2.35619449"/>
+    <parent link="moz1_chassis"/><child link="wheel02"/><axis xyz="0 1 0"/>
+  </joint>
+  <xacro:mesh_link name="wheel03" mesh="wheel.STL"/>
+  <joint name="Base-2" type="continuous">
+    <origin xyz="-0.2423 -0.2423 0" rpy="0 0 -0.785398163"/>
+    <parent link="moz1_chassis"/><child link="wheel03"/><axis xyz="0 1 0"/>
+  </joint>
+  <xacro:mesh_link name="wheel04" mesh="wheel.STL"/>
+  <joint name="Base-3" type="continuous">
+    <origin xyz="0.2423 -0.2423 0" rpy="0 0 0.785398163"/>
+    <parent link="moz1_chassis"/><child link="wheel04"/><axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- ====================================================================
+       LEG / WAIST (torso) CHAIN  (CAD-faithful)  base_link -> waist03
+       LegWaist-0..5 . This is the "torso" optional MoveIt group.
+       ==================================================================== -->
+  <xacro:mesh_link name="leg01"/>
+  <joint name="LegWaist-0" type="revolute">
+    <origin xyz="0 0.1114 0.1875" rpy="0 0 0"/>
+    <parent link="moz1_chassis"/><child link="leg01"/><axis xyz="0 1 0"/>
+    <limit lower="-0.523598776" upper="0.523598776" effort="100.0" velocity="0.5"/>
+  </joint>
+  <xacro:mesh_link name="leg02"/>
+  <joint name="LegWaist-1" type="revolute">
+    <origin xyz="0 0 0.122" rpy="0 0 0"/>
+    <parent link="leg01"/><child link="leg02"/><axis xyz="1 0 0"/>
+    <limit lower="-1.570796327" upper="1.570796327" effort="100.0" velocity="0.5"/>
+  </joint>
+  <xacro:mesh_link name="leg03"/>
+  <joint name="LegWaist-2" type="revolute">
+    <origin xyz="0 0 0.285" rpy="0 0 0"/>
+    <parent link="leg02"/><child link="leg03"/><axis xyz="1 0 0"/>
+    <limit lower="-2.530727415" upper="0.017453293" effort="100.0" velocity="0.5"/>
+  </joint>
+  <xacro:mesh_link name="waist01"/>
+  <joint name="LegWaist-3" type="revolute">
+    <origin xyz="0 0 0.318" rpy="0 0 0"/>
+    <parent link="leg03"/><child link="waist01"/><axis xyz="1 0 0"/>
+    <limit lower="-0.174532925" upper="1.396263402" effort="100.0" velocity="0.5"/>
+  </joint>
+  <xacro:mesh_link name="waist02" material="moz1_light"/>
+  <joint name="LegWaist-4" type="revolute">
+    <origin xyz="0 0 0.12" rpy="0 0 0"/>
+    <parent link="waist01"/><child link="waist02"/><axis xyz="0 1 0"/>
+    <limit lower="-0.523598776" upper="0.523598776" effort="100.0" velocity="0.5"/>
+  </joint>
+  <xacro:mesh_link name="waist03"/>
+  <joint name="LegWaist-5" type="revolute">
+    <origin xyz="0 0 0.1019" rpy="0 0 0"/>
+    <parent link="waist02"/><child link="waist03"/><axis xyz="0 0 1"/>
+    <limit lower="-3.141592654" upper="3.141592654" effort="100.0" velocity="0.5"/>
+  </joint>
+
+  <!-- ====================================================================
+       HEAD CHAIN  (CAD-faithful, all fixed)
+       ==================================================================== -->
+  <xacro:mesh_link name="head21"/>
+  <joint name="Head-0" type="fixed">
+    <origin xyz="0 0 0.3491" rpy="0 0 0"/>
+    <parent link="waist03"/><child link="head21"/>
+  </joint>
+  <xacro:mesh_link name="head22"/>
+  <joint name="Head-1" type="fixed">
+    <origin xyz="0 0 0.103" rpy="0 0 0"/>
+    <parent link="head21"/><child link="head22"/>
+  </joint>
+  <xacro:mesh_link name="head23"/>
+  <joint name="Head-2" type="fixed">
+    <origin xyz="0 0 0.04" rpy="0 0 0"/>
+    <parent link="head22"/><child link="head23"/>
+  </joint>
+
+  <!-- ====================================================================
+       NECK NAME PLACEHOLDERS  (added 2026-08-08)
+
+       WHY THESE EXIST — they are NOT kinematics.
+       The robot controller publishes /joint_states itself (node MCMessageNode,
+       19.995 Hz) using the SDK's own unit naming, which includes Neck-0 and
+       Neck-1 (MechUnit NECK has 2 axes). Our model had no joint by either name,
+       so MoveIt's state monitor called RobotModel::getJointModel() on each
+       incoming name and logged, twice per message = 40 times a second:
+
+           [moveit_robot_model.robot_model]: Joint 'Neck-0' not found in model 'moz1'
+           [moveit_robot_model.robot_model]: Joint 'Neck-1' not found in model 'moz1'
+
+       Harmless in itself, but it buries every real error in the log. Declaring
+       the names makes getJointModel() resolve, and MoveIt then SKIPS them
+       because a fixed joint has 0 variables (its state monitor ignores any joint
+       whose variable count != 1). Silence without granting control.
+
+       WHY FIXED, AND WHY NOT A RENAME.
+       The neck is genuinely not modelled: the real 2-DOF axes, limits and
+       offsets are unknown. Head-0..2 above are three CAD-faithful *pure
+       translations* with no axis, so renaming two of them to Neck-0/Neck-1
+       would encode a guess about which physical axis is which. These are zero-
+       transform aliases instead — coincident with waist03, no visual, no
+       collision, no mass — following the SEMANTIC ALIAS FRAMES convention just
+       below. They claim nothing.
+
+       ⚠ FIXED IS LOAD-BEARING. Make these revolute and the neck becomes
+       plannable, and MoveIt would happily command a joint that CANNOT be driven:
+       NECK ignores send_pos_tracking_cmd — it accepts the call and does not move
+       (#31) — and only responds to start_move, a non-RT blocking verb that
+       cannot belong to a joint_trajectory_controller. moz1_hardware refuses
+       Head-* and Neck-* for that reason. Drive the neck from L4, not
+       ros2_control. When the real kinematics arrive, replace these in place.
+       See docs/cpp_sdk_migration.md §12.23.
+       ==================================================================== -->
+  <link name="neck0_link"/>
+  <joint name="Neck-0" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="waist03"/><child link="neck0_link"/>
+  </joint>
+  <link name="neck1_link"/>
+  <joint name="Neck-1" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="neck0_link"/><child link="neck1_link"/>
+  </joint>
+
+  <!-- ====================================================================
+       SEMANTIC ALIAS FRAMES (PLACEHOLDER) - stable names for downstream code
+       that expects "torso_link" / "head_link" regardless of CAD link naming.
+       ==================================================================== -->
+  <link name="torso_link"/>
+  <joint name="torso_link_alias_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="waist03"/><child link="torso_link"/>
+  </joint>
+  <link name="head_link"/>
+  <joint name="head_link_alias_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="head23"/><child link="head_link"/>
+  </joint>
+
+  <!-- ====================================================================
+       ARMS  (CAD-faithful 7-DOF each; only J0/J3 limits & mount mirrored)
+       ==================================================================== -->
+  <xacro:moz1_arm side="left"  jprefix="LeftArm"
+                  mesh_rpy="0 0 0"
+                  mount_xyz="0.1257 0 0.2531"  mount_rpy="0 0 0"
+                  j0_lower="-3.141592654" j0_upper="2.094395102"
+                  j3_lower="-2.251474735" j3_upper="0.174532925"/>
+
+  <xacro:moz1_arm side="right" jprefix="RightArm"
+                  mesh_rpy="0 0 -3.14159265359"
+                  mount_xyz="-0.1257 0 0.2531" mount_rpy="0 0 3.14159265359"
+                  j0_lower="-2.094395102" j0_upper="3.141592654"
+                  j3_lower="-0.174532925" j3_upper="2.251474735"/>
+
+  <!-- ====================================================================
+       GRIPPERS (real vendor CAD; 1-DOF four-bar - see 12.34)
+       ==================================================================== -->
+  <xacro:moz1_gripper side="left"  jname="left_gripper_joint"/>
+  <xacro:moz1_gripper side="right" jname="right_gripper_joint"/>
+
+  <!-- ====================================================================
+       WRIST CAMERAS (real vendor CAD: D405 + its clamp bracket - see 12.35)
+       yaw = clocking about the gripper axis; the CAD cannot fix it (a clamp
+       saddle mounts at any angle). -pi/2 puts each camera OUTBOARD, per the
+       operator: with every arm joint at zero the mounts sit at the robot's
+       far left / far right. Outboard is gripper -X on BOTH arms, so both sides
+       take the same yaw. ⚠ The operator also reports both signal ports face
+       robot-left; that is a statement about a particular wrist roll and is
+       still unconfirmed against hardware.
+       ==================================================================== -->
+  <xacro:arg name="left_wrist_camera_yaw"  default="-1.5707963267948966"/>
+  <xacro:arg name="right_wrist_camera_yaw" default="-1.5707963267948966"/>
+  <xacro:moz1_wrist_camera side="left"  yaw="$(arg left_wrist_camera_yaw)"/>
+  <xacro:moz1_wrist_camera side="right" yaw="$(arg right_wrist_camera_yaw)"/>
+
+  <!-- ====================================================================
+       SENSOR FRAMES (PLACEHOLDER transforms - measure & update before use)
+       ==================================================================== -->
+  <!-- Livox Mid-360 LiDAR: NOT defined here. The nav stack publishes the
+       base_link -> livox_frame static TF from livox_bringup.launch.py with
+       the measured mount offset; declaring it in the URDF too would
+       duplicate the child frame and the launch's value would silently lose
+       (TF doesn't allow two parents for one child). If you need livox_frame
+       for a manip-only workflow without livox_bringup, publish it from
+       display.launch.py instead. -->
+  <!-- Originally:
+       <xacro:frame_marker name="livox_frame" material="moz1_sensor" size="0.04"/>
+       <joint name="livox_frame_joint" type="fixed">
+         <origin xyz="0.0 0.0 0.05" rpy="0 0 0"/>
+         <parent link="base_link"/><child link="livox_frame"/>
+       </joint>
+    -->
+  <!-- Head camera placeholder.
+
+       ⚠ PLACEHOLDER POSE — xyz below is round numbers off head23, never
+       measured against hardware. CALIBRATE THIS, then delete this warning.
+       Everything downstream of head_camera_link inherits the error, including
+       cam_high_color_optical_frame added just below. -->
+  <xacro:property name="cam_high_mount_xyz" value="0.05 0 0.02"/>
+  <xacro:property name="cam_high_mount_rpy" value="0 0 0"/>
+
+  <xacro:frame_marker name="head_camera_link" material="moz1_sensor"/>
+  <joint name="head_camera_joint" type="fixed">
+    <origin xyz="${cam_high_mount_xyz}" rpy="${cam_high_mount_rpy}"/>
+    <parent link="head23"/><child link="head_camera_link"/>
+  </joint>
+
+  <!-- ================= Aruco optical frame (cam_high) =================
+       moz1_camera stamps every Image and CameraInfo with
+       "<name>_color_optical_frame" (camera_node.py), so for the head camera
+       that is cam_high_color_optical_frame. aruco_opencv resolves THAT name
+       against TF to honour output_frame:=base_link; with no such frame the
+       tracker starts, subscribes, and silently publishes nothing — the same
+       shape of failure as an unsourced workspace, and just as quiet.
+
+       Mirrors cam_<side>_wrist_color_optical_frame in
+       moz1_wrist_camera_macros.xacro, which exists for exactly this reason.
+
+       THE ROTATION IS DERIVED, NOT COPIED. The textbook body->optical value
+       rpy=(-pi/2, 0, -pi/2) is WRONG here, and wrong in the quiet way: head23
+       comes from the CAD export and is rotated 90 deg about Z from base_link
+       (its +X points along base_link +Y), so the standard value aims the camera
+       out of the robot's LEFT SIDE while looking entirely correct in the file.
+       (-pi/2, 0, pi) is what actually yields the ROS optical convention
+       (+Z forward along base_link +X, +Y down, +X image-right) against THIS
+       parent. Solved and checked against the composed chain, not assumed.
+
+       ⚠ It assumes the head camera looks STRAIGHT FORWARD AND LEVEL. A head
+       camera is commonly pitched down toward the workspace; if this one is,
+       that pitch belongs in cam_high_mount_rpy above, measured.
+
+       ⚠ THE POSITION IS STILL UNCALIBRATED, inherited from the placeholder
+       above. This frame makes cam_high detections RESOLVE; it does not make
+       them ACCURATE. Until head_camera_joint is measured, an ArUco pose from
+       cam_high is wrong by however far the placeholder sits from the real lens,
+       and it will be wrong CONFIDENTLY — the tracker reports no uncertainty
+       about its extrinsic. Verify against a known point before trusting it to
+       plan, and prefer the wrist cameras for absolute positioning until then. -->
+  <link name="cam_high_color_optical_frame"/>
+  <joint name="cam_high_color_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${pi}"/>
+    <parent link="head_camera_link"/><child link="cam_high_color_optical_frame"/>
+  </joint>
+  <!-- Chest/torso camera placeholder. -->
+  <xacro:frame_marker name="torso_camera_link" material="moz1_sensor"/>
+  <joint name="torso_camera_joint" type="fixed">
+    <origin xyz="0.08 0 0.1" rpy="0 0 0"/>
+    <parent link="waist03"/><child link="torso_camera_link"/>
+  </joint>
+  <!-- EE cartesian origin -->
+  <link name="ee_origin_link"/>
+  <joint name="ee_origin_joint" type="fixed">
+    <origin xyz="0 0 0.2531" rpy="0 0 0"/>
+    <parent link="waist03"/><child link="ee_origin_link"/>
+  </joint>
+
+</robot>

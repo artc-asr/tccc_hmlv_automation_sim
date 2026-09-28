@@ -1,0 +1,62 @@
+# gazebo_controllers.yaml — ros2_control controllers for the Gazebo Moz1.
+#
+# Loaded by the gazebo_ros2_control plugin (moz1_gazebo.urdf.xacro). These are
+# the SAME controller names/types moz1_moveit_config uses, so move_group drives
+# the sim exactly as it drives the real robot's FollowJointTrajectory controllers.
+# (Copied from moz1_moveit_config/config/ros2_controllers.yaml — keep in sync.)
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+    use_sim_time: true
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    torso_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    left_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    right_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    left_gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    right_gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+# Holds the torso (leg/waist) upright at its home pose. Without an active
+# controller these position-command joints go limp and the upper body slumps
+# when the base moves. The real robot's torso motors are always energized; this
+# controller emulates that. (LegWaist-0..5 initial values are set in the URDF.)
+torso_controller:
+  ros__parameters:
+    joints: [LegWaist-0, LegWaist-1, LegWaist-2, LegWaist-3, LegWaist-4, LegWaist-5]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+left_arm_controller:
+  ros__parameters:
+    joints: [LeftArm-0, LeftArm-1, LeftArm-2, LeftArm-3, LeftArm-4, LeftArm-5, LeftArm-6]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+right_arm_controller:
+  ros__parameters:
+    joints: [RightArm-0, RightArm-1, RightArm-2, RightArm-3, RightArm-4, RightArm-5, RightArm-6]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+left_gripper_controller:
+  ros__parameters:
+    joints: [left_gripper_joint]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+right_gripper_controller:
+  ros__parameters:
+    joints: [right_gripper_joint]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true

@@ -1,0 +1,608 @@
+# ============================================================================
+# moveit.rviz — RViz layout for real.launch.py and demo.launch.py.
+#
+# ⚠ THIS FILE IS REWRITTEN BY RVIZ. Ctrl+S in RViz saves to whatever path was
+# passed with -d, which is the INSTALL copy
+# (moz1_manip_ws/install/moz1_moveit_config/share/moz1_moveit_config/config/),
+# NOT this one — so a saved layout is lost on the next `colcon build` unless it
+# is copied back here. That is what happened on 2026-08-08; this file is the
+# result of that copy.
+#
+# ⚠ RViz's writer STRIPS EVERY YAML COMMENT. The comments in this file will
+# vanish the next time you Ctrl+S. Workflow that survives:
+#     1. arrange RViz, Ctrl+S            (writes the install copy, no comments)
+#     2. cp install/.../moveit.rviz  src/.../moveit.rviz
+#     3. re-add the comment blocks below
+#     4. colcon build --packages-select moz1_moveit_config
+# Keep the comments few and load-bearing for exactly this reason.
+# ============================================================================
+Panels:
+  - Class: rviz_common/Displays
+    Help Height: 70
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /MotionPlanning1
+      Splitter Ratio: 0.5
+    Tree Height: 369
+  - Class: rviz_common/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 10
+      Reference Frame: <Fixed Frame>
+      Value: true
+    # 🔴 THIS IS THE REAL SPEED KNOB FOR ANYTHING PLANNED FROM RVIZ.
+    # Paired with Velocity_Scaling_Factor near the end of this display block.
+    # These two are the Planning-tab spinboxes, and RViz sends them with EVERY
+    # plan request — which OVERRIDES joint_limits_real.yaml's
+    # default_{velocity,acceleration}_scaling_factor (a request field only falls
+    # back to the YAML default when it is left at 0). Measured: an explicit
+    # request value changes the trajectory duration while the YAML default is
+    # held constant (§12.21).
+    # So effective RViz speed = per-joint max_velocity x THIS, and the YAML
+    # scaling factor is a no-op for RViz-driven motion. 0.1 here means 10 % of
+    # the limits in joint_limits_real.yaml.
+    # Kept in sync with joint_limits_real.yaml's
+    # default_acceleration_scaling_factor (0.5) — set 2026-08-08.
+    - Acceleration_Scaling_Factor: 0.5
+      Class: moveit_rviz_plugin/MotionPlanning
+      Enabled: true
+      Move Group Namespace: ""
+      MoveIt_Allow_Approximate_IK: false
+      MoveIt_Allow_External_Program: false
+      MoveIt_Allow_Replanning: false
+      MoveIt_Allow_Sensor_Positioning: false
+      MoveIt_Planning_Attempts: 10
+      MoveIt_Planning_Time: 5
+      MoveIt_Use_Cartesian_Path: false
+      MoveIt_Use_Constraint_Aware_IK: false
+      MoveIt_Workspace:
+        Center:
+          X: 0
+          Y: 0
+          Z: 0
+        Size:
+          X: 2
+          Y: 2
+          Z: 2
+      Name: MotionPlanning
+      Planned Path:
+        Color Enabled: false
+        Interrupt Display: false
+        Links:
+          All Links Enabled: true
+          Expand Joint Details: false
+          Expand Link Details: false
+          Expand Tree: false
+          Link Tree Style: Links in Alphabetic Order
+          base_footprint:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          head21:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          head22:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          head23:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          head_camera_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          head_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          left01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left04:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left05:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left06:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left07:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left_ee_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left_gripper_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left_gripper_finger_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leg01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leg02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leg03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          moz1_chassis:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right04:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right05:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right06:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right07:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_ee_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_gripper_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_gripper_finger_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          torso_camera_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          torso_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          waist01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          waist02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          waist03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          wheel01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          wheel02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          wheel03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          wheel04:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+        Loop Animation: false
+        Robot Alpha: 0.5
+        Robot Color: 150; 50; 150
+        Show Robot Collision: false
+        Show Robot Visual: true
+        Show Trail: false
+        State Display Time: 0.05 s
+        Trail Step Size: 1
+        Trajectory Topic: /display_planned_path
+        Use Sim Time: false
+      Planning Metrics:
+        Payload: 1
+        Show Joint Torques: false
+        Show Manipulability: false
+        Show Manipulability Index: false
+        Show Weight Limit: false
+        TextHeight: 0.07999999821186066
+      Planning Request:
+        Colliding Link Color: 255; 0; 0
+        Goal State Alpha: 1
+        Goal State Color: 250; 128; 0
+        # Ergonomics only. 0 = auto-scale, which on this robot computes 0.0678 m —
+        # a 7 cm marker on a 1.5 m humanoid, drawn inside the gripper mesh.
+        # ⚠ NOT why the marker was invisible on 2026-08-08: that was the SRDF
+        # virtual_joint naming a child_link that is not the URDF root, which split
+        # tf into two trees so RViz could not transform the marker into Fixed Frame
+        # 'world' at all. Size was a red herring. See moz1.srdf, §12.20.
+        Interactive Marker Size: 0.25
+        Joint Violation Color: 255; 0; 255
+        Planning Group: left_arm
+        Query Goal State: true
+        Query Start State: false
+        Show Workspace: false
+        Start State Alpha: 1
+        Start State Color: 0; 255; 0
+      Planning Scene Topic: /monitored_planning_scene
+      Robot Description: robot_description
+      Scene Geometry:
+        Scene Alpha: 0.8999999761581421
+        Scene Color: 50; 230; 50
+        Scene Display Time: 0.009999999776482582
+        Show Scene Geometry: true
+        Voxel Coloring: Z-Axis
+        Voxel Rendering: Occupied Voxels
+      Scene Robot:
+        Attached Body Color: 150; 50; 150
+        Links:
+          All Links Enabled: true
+          Expand Joint Details: false
+          Expand Link Details: false
+          Expand Tree: false
+          Link Tree Style: Links in Alphabetic Order
+          base_footprint:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          head21:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          head22:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          head23:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          head_camera_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          head_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          left01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left04:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left05:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left06:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left07:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left_ee_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left_gripper_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left_gripper_finger_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leg01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leg02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leg03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          moz1_chassis:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right04:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right05:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right06:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right07:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_ee_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_gripper_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_gripper_finger_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          torso_camera_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          torso_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          waist01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          waist02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          waist03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          wheel01:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          wheel02:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          wheel03:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          wheel04:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+        Robot Alpha: 0.5
+        Show Robot Collision: false
+        Show Robot Visual: true
+      Value: true
+      # 🔴 See the note on Acceleration_Scaling_Factor at the top of this display
+      # block: this is the Planning-tab spinbox, it is sent with every RViz plan,
+      # and it OVERRIDES joint_limits_real.yaml's default_velocity_scaling_factor.
+      # 0.1 = 10 % of the per-joint limits. Change together with the acceleration
+      # factor above, or the profile stays acceleration-bound.
+      # Kept in sync with joint_limits_real.yaml's
+      # default_velocity_scaling_factor (1.0) — set 2026-08-08. 1.0 = the full
+      # per-joint max_velocity envelope; RViz's spinbox can only go DOWN from here.
+      Velocity_Scaling_Factor: 1.0
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: world
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 3
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0.8999999761581421
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.239999920129776
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 0.37000948190689087
+    Saved: ~
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 1376
+  Hide Left Dock: false
+  Hide Right Dock: true
+  MotionPlanning:
+    collapsed: false
+  MotionPlanning - Trajectory Slider:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd0000000200000000000002b400000506fc0200000003fb00000044004d006f00740069006f006e0050006c0061006e006e0069006e00670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000004100fffffffb000000100044006900730070006c006100790073010000003d000001f4000000c900fffffffb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e006701000002370000030c0000017d00ffffff00000001000001cb0000032afc0200000001fb0000000a00560069006500770073000000003d0000032a000000a400ffffff000007000000050600000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Views:
+    collapsed: true
+  Width: 2490
+  X: 70
+  Y: 27

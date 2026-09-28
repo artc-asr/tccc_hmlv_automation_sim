@@ -1,0 +1,216 @@
+<?xml version="1.0"?>
+<!-- Gazebo FORTRESS (gz-sim) pick-and-place world for the CRP13 use cases, laid
+     out as a small lab cell (matches the reference photo):
+
+       * WORKBENCH in FRONT of the robot (+x) with two BINS on top — bearing rings
+         in the pick bin, an empty place bin (bearing pick AND place happen here).
+       * METAL SHELF BEHIND the robot (-x) holding TRAYS of SAMPLE BOTTLES — the
+         robot turns ~180 deg to pick from it.
+       * A PLACE TABLE on the robot's LEFT (+y) where bottles are placed.
+       * Decor: operator desk+monitor+chair, utility cart+blue tray (static props).
+
+     Robot spawns at the origin facing +x. Nav standoffs are in
+     agents/navigation_agent/mock.py (bearing_ring_pick=(1.0,0), sample_bottle_pick=
+     (-1.05,0), sample_bottle_place=(0,1.1)). Everything is a flat, single-link
+     box/cylinder <model> so scripts/scene_markers.py mirrors the scene into RViz.
+     Only the two GRASP TARGETS (bearing_ring, sample_bottle) are dynamic; all else
+     is static (light physics, no jitter). Ground+sun inline (no Fuel/internet). -->
+<sdf version="1.8">
+  <world name="moz1_pickplace">
+
+    <!-- core gz-sim systems (Sensors+Imu enable the lidar/imu on the robot) -->
+    <plugin filename="ignition-gazebo-physics-system" name="ignition::gazebo::systems::Physics"/>
+    <plugin filename="ignition-gazebo-user-commands-system" name="ignition::gazebo::systems::UserCommands"/>
+    <plugin filename="ignition-gazebo-scene-broadcaster-system" name="ignition::gazebo::systems::SceneBroadcaster"/>
+    <plugin filename="ignition-gazebo-sensors-system" name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="ignition-gazebo-imu-system" name="ignition::gazebo::systems::Imu"/>
+
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <scene><ambient>0.6 0.6 0.6 1</ambient><grid>false</grid></scene>
+
+    <light type="directional" name="sun">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 10 0 0 0</pose><diffuse>0.9 0.9 0.9 1</diffuse><specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.3 -1</direction>
+    </light>
+
+    <model name="ground_plane"><static>true</static>
+      <link name="link">
+        <collision name="c"><geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry></collision>
+        <visual name="v"><geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+          <material><ambient>0.7 0.7 0.7 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- ============ BEARING STATION — workbench in FRONT (+x), robot faces it ===
+         Solid box workbench (top ~0.70 m) with two bins on top: pick (rings) at
+         y=-0.35, place (empty) at y=+0.35. Standoff bearing_ring_pick=(1.0,0,0). -->
+    <!-- Workbench at counter height (top 0.82 m): the arms rest at base_link z≈0.95
+         (~1.07 m world), so surfaces are high. Depth 0.65, near edge x=1.50 (just
+         past the (1.0,0) standoff), far edge 2.15 — so the bins below sit FULLY on
+         the top, none overhanging. -->
+    <model name="workbench"><static>true</static><pose>1.825 0 0.41 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.65 1.4 0.82</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.65 1.4 0.82</size></box></geometry>
+          <material><ambient>0.5 0.5 0.55 1</ambient><diffuse>0.6 0.6 0.65 1</diffuse></material></visual>
+      </link>
+    </model>
+    <!-- Bins sit ON the workbench top (bottom z=0.82) at the near-left edge (x=1.62,
+         span 1.50-1.74 — fully on the 1.50-2.15 top), left arm side (y+). -->
+    <model name="bin_bearing_pick"><static>true</static><pose>1.62 0.30 0.87 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.24 0.24 0.10</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.24 0.24 0.10</size></box></geometry>
+          <material><ambient>0.12 0.12 0.14 1</ambient><diffuse>0.18 0.18 0.20 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="bin_bearing_place"><static>true</static><pose>1.62 0.05 0.87 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.24 0.24 0.10</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.24 0.24 0.10</size></box></geometry>
+          <material><ambient>0.12 0.12 0.14 1</ambient><diffuse>0.18 0.18 0.20 1</diffuse></material></visual>
+      </link>
+    </model>
+    <!-- bearing_ring: the DYNAMIC grasp target, resting on the pick bin (top 0.92). -->
+    <model name="bearing_ring"><static>false</static><pose>1.62 0.30 0.93 0 0 0</pose>
+      <link name="link">
+        <inertial><mass>0.15</mass><inertia><ixx>1e-4</ixx><iyy>1e-4</iyy><izz>1e-4</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia></inertial>
+        <collision name="c"><geometry><cylinder><radius>0.05</radius><length>0.02</length></cylinder></geometry></collision>
+        <visual name="v"><geometry><cylinder><radius>0.05</radius><length>0.02</length></cylinder></geometry>
+          <material><ambient>0.6 0.6 0.65 1</ambient><diffuse>0.75 0.75 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <!-- static filler rings (scenery, not grasped) -->
+    <model name="bearing_ring_filler_1"><static>true</static><pose>1.58 0.34 0.93 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><cylinder><radius>0.05</radius><length>0.02</length></cylinder></geometry>
+        <material><ambient>0.6 0.6 0.65 1</ambient><diffuse>0.72 0.72 0.78 1</diffuse></material></visual></link></model>
+    <model name="bearing_ring_filler_2"><static>true</static><pose>1.66 0.26 0.93 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><cylinder><radius>0.05</radius><length>0.02</length></cylinder></geometry>
+        <material><ambient>0.6 0.6 0.65 1</ambient><diffuse>0.72 0.72 0.78 1</diffuse></material></visual></link></model>
+
+    <!-- ============ BOTTLE STATION — metal shelf BEHIND (-x) ====================
+         Side panels + 4 plates; trays hold bottles. The pick tray is at a reachable
+         mid height (plate z=0.60). Standoff sample_bottle_pick=(-1.05,0,pi). -->
+    <model name="shelf_side_left"><static>true</static><pose>-1.9 0.55 0.9 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.5 0.05 1.8</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.5 0.05 1.8</size></box></geometry>
+          <material><ambient>0.45 0.45 0.5 1</ambient><diffuse>0.55 0.55 0.6 1</diffuse></material></visual></link></model>
+    <model name="shelf_side_right"><static>true</static><pose>-1.9 -0.55 0.9 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.5 0.05 1.8</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.5 0.05 1.8</size></box></geometry>
+          <material><ambient>0.45 0.45 0.5 1</ambient><diffuse>0.55 0.55 0.6 1</diffuse></material></visual></link></model>
+    <model name="shelf_plate_0"><static>true</static><pose>-1.9 0 0.30 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.5 1.1 0.04</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.5 1.1 0.04</size></box></geometry>
+          <material><ambient>0.5 0.5 0.55 1</ambient><diffuse>0.6 0.6 0.65 1</diffuse></material></visual></link></model>
+    <model name="shelf_plate_1"><static>true</static><pose>-1.9 0 0.60 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.5 1.1 0.04</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.5 1.1 0.04</size></box></geometry>
+          <material><ambient>0.5 0.5 0.55 1</ambient><diffuse>0.6 0.6 0.65 1</diffuse></material></visual></link></model>
+    <model name="shelf_plate_2"><static>true</static><pose>-1.9 0 1.00 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.5 1.1 0.04</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.5 1.1 0.04</size></box></geometry>
+          <material><ambient>0.5 0.5 0.55 1</ambient><diffuse>0.6 0.6 0.65 1</diffuse></material></visual></link></model>
+    <model name="shelf_plate_3"><static>true</static><pose>-1.9 0 1.40 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.5 1.1 0.04</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.5 1.1 0.04</size></box></geometry>
+          <material><ambient>0.5 0.5 0.55 1</ambient><diffuse>0.6 0.6 0.65 1</diffuse></material></visual></link></model>
+    <!-- trays on the plates -->
+    <!-- pick tray on the z=1.00 shelf plate at the right arm's reach from the
+         (-1.25,0,π) standoff: grasp target ≈ base_link (0.45,-0.30,0.98) ≈ the
+         measured right-hand home pose. -->
+    <model name="tray_bottle_pick"><static>true</static><pose>-1.70 0.30 1.06 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><box><size>0.4 0.4 0.08</size></box></geometry>
+        <material><ambient>0.3 0.35 0.4 1</ambient><diffuse>0.4 0.45 0.5 1</diffuse></material></visual></link></model>
+    <model name="tray_filler_upper"><static>true</static><pose>-1.85 0 1.06 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><box><size>0.4 0.5 0.08</size></box></geometry>
+        <material><ambient>0.3 0.35 0.4 1</ambient><diffuse>0.4 0.45 0.5 1</diffuse></material></visual></link></model>
+    <model name="tray_filler_lower"><static>true</static><pose>-1.85 0 0.36 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><box><size>0.4 0.5 0.08</size></box></geometry>
+        <material><ambient>0.3 0.35 0.4 1</ambient><diffuse>0.4 0.45 0.5 1</diffuse></material></visual></link></model>
+    <!-- sample_bottle: the DYNAMIC grasp target (on the pick tray). -->
+    <model name="sample_bottle"><static>false</static><pose>-1.70 0.30 1.14 0 0 0</pose>
+      <link name="link">
+        <inertial><mass>0.08</mass><inertia><ixx>1e-4</ixx><iyy>1e-4</iyy><izz>3e-5</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia></inertial>
+        <collision name="c"><geometry><cylinder><radius>0.03</radius><length>0.15</length></cylinder></geometry></collision>
+        <visual name="v"><geometry><cylinder><radius>0.03</radius><length>0.15</length></cylinder></geometry>
+          <material><ambient>0.2 0.4 0.7 1</ambient><diffuse>0.3 0.55 0.85 1</diffuse></material></visual>
+      </link>
+    </model>
+    <!-- static filler bottles (scenery) -->
+    <model name="sample_bottle_filler_1"><static>true</static><pose>-1.90 0.12 1.15 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><cylinder><radius>0.03</radius><length>0.15</length></cylinder></geometry>
+        <material><ambient>0.2 0.4 0.7 1</ambient><diffuse>0.3 0.55 0.85 1</diffuse></material></visual></link></model>
+    <model name="sample_bottle_filler_2"><static>true</static><pose>-1.80 -0.12 1.15 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><cylinder><radius>0.03</radius><length>0.15</length></cylinder></geometry>
+        <material><ambient>0.2 0.4 0.7 1</ambient><diffuse>0.3 0.55 0.85 1</diffuse></material></visual></link></model>
+    <model name="sample_bottle_filler_3"><static>true</static><pose>-1.85 0.14 0.45 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><cylinder><radius>0.03</radius><length>0.15</length></cylinder></geometry>
+        <material><ambient>0.2 0.4 0.7 1</ambient><diffuse>0.3 0.55 0.85 1</diffuse></material></visual></link></model>
+
+    <!-- ============ PLACE TABLE — robot's LEFT (+y), for placing bottles ========
+         Standoff sample_bottle_place=(0,1.1,pi/2). -->
+    <model name="place_table"><static>true</static><pose>0 2.0 0.425 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.8 0.8 0.85</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.8 0.8 0.85</size></box></geometry>
+          <material><ambient>0.65 0.65 0.68 1</ambient><diffuse>0.78 0.78 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- ============ Decor (static visual props; also Nav2 obstacles) ============ -->
+    <model name="desk"><static>true</static><pose>2.6 -2.2 0.36 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.7 1.2 0.72</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.7 1.2 0.72</size></box></geometry>
+          <material><ambient>0.6 0.6 0.62 1</ambient><diffuse>0.72 0.72 0.74 1</diffuse></material></visual></link></model>
+    <model name="monitor"><static>true</static><pose>2.75 -2.2 0.92 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><box><size>0.05 0.5 0.35</size></box></geometry>
+        <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material></visual></link></model>
+    <model name="chair_seat"><static>true</static><pose>2.0 -2.2 0.48 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><box><size>0.45 0.45 0.06</size></box></geometry>
+        <material><ambient>0.1 0.1 0.12 1</ambient><diffuse>0.15 0.15 0.18 1</diffuse></material></visual></link></model>
+    <model name="chair_back"><static>true</static><pose>2.0 -2.42 0.72 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><box><size>0.45 0.05 0.45</size></box></geometry>
+        <material><ambient>0.1 0.1 0.12 1</ambient><diffuse>0.15 0.15 0.18 1</diffuse></material></visual></link></model>
+    <model name="cart"><static>true</static><pose>-0.5 -1.9 0.40 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.5 0.7 0.80</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.5 0.7 0.80</size></box></geometry>
+          <material><ambient>0.5 0.5 0.52 1</ambient><diffuse>0.6 0.6 0.63 1</diffuse></material></visual></link></model>
+    <model name="cart_tray_blue"><static>true</static><pose>-0.5 -1.9 0.86 0 0 0</pose>
+      <link name="link"><visual name="v"><geometry><box><size>0.5 0.7 0.10</size></box></geometry>
+        <material><ambient>0.1 0.3 0.8 1</ambient><diffuse>0.15 0.4 0.9 1</diffuse></material></visual></link></model>
+
+    <!-- ===== Room walls (2 m tall): lidar/SLAM features + nav bounds.
+         Room spans x[-3,6] y[-4,4] around the robot origin. -->
+    <model name="wall_north"><static>true</static><pose>1.5 4 1 0 0 0</pose><link name="link">
+      <collision name="c"><geometry><box><size>9 0.1 2</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>9 0.1 2</size></box></geometry>
+        <material><ambient>0.55 0.55 0.6 1</ambient><diffuse>0.6 0.6 0.65 1</diffuse></material></visual></link></model>
+    <model name="wall_south"><static>true</static><pose>1.5 -4 1 0 0 0</pose><link name="link">
+      <collision name="c"><geometry><box><size>9 0.1 2</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>9 0.1 2</size></box></geometry>
+        <material><ambient>0.55 0.55 0.6 1</ambient><diffuse>0.6 0.6 0.65 1</diffuse></material></visual></link></model>
+    <model name="wall_east"><static>true</static><pose>6 0 1 0 0 0</pose><link name="link">
+      <collision name="c"><geometry><box><size>0.1 8 2</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>0.1 8 2</size></box></geometry>
+        <material><ambient>0.55 0.55 0.6 1</ambient><diffuse>0.6 0.6 0.65 1</diffuse></material></visual></link></model>
+    <model name="wall_west"><static>true</static><pose>-3 0 1 0 0 0</pose><link name="link">
+      <collision name="c"><geometry><box><size>0.1 8 2</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>0.1 8 2</size></box></geometry>
+        <material><ambient>0.55 0.55 0.6 1</ambient><diffuse>0.6 0.6 0.65 1</diffuse></material></visual></link></model>
+  </world>
+</sdf>

@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- ========================================================================
+     materials.xacro - shared RViz/MoveIt colors for the Moz1 model.
+     These are visual-only and have no effect on planning or hardware.
+     ===================================================================== -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <material name="moz1_grey">
+    <color rgba="0.8 0.8 0.8 1.0"/>
+  </material>
+
+  <material name="moz1_light">
+    <color rgba="0.89804 0.91765 0.92941 1.0"/>
+  </material>
+
+  <!-- Placeholder parts (gripper / sensor frames) use a distinct color so it
+       is obvious in RViz which geometry is NOT from the official CAD. -->
+  <material name="moz1_placeholder">
+    <color rgba="0.95 0.55 0.10 1.0"/>
+  </material>
+
+  <material name="moz1_sensor">
+    <color rgba="0.10 0.45 0.85 1.0"/>
+  </material>
+
+</robot>

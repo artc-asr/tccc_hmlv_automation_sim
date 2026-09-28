@@ -1,0 +1,143 @@
+<?xml version="1.0"?>
+<!-- ========================================================================
+     moz1_wrist_camera_macros.xacro - wrist Intel RealSense D405 + its bracket.
+
+     Both meshes are the VENDOR CAD, converted from the supplied STEP files with
+     scripts/step_to_stl_occ.py (see docs/cpp_sdk_migration.md 12.36). They are
+     in METRES, like every other mesh in this package - no scale= attribute.
+
+     HOW IT MOUNTS (measured from the CAD, not guessed)
+       The bracket is a CLAMP SADDLE, not a full collar:
+         * concave bore  Ø57.50 mm, 110 deg of wrap, 10 mm tall
+         * outer skin    Ø67.00 mm
+         * 2 x M3 radial clamp screws at +/-45 deg from the saddle centreline
+       It grips the GRIPPER BODY, whose measured cylinder is Ø57.28 mm
+       (r = 28.64 +/- 0.02 mm, full 360 deg) -> a 0.22 mm diametral slip fit.
+       Its Ø67.00 outer skin is flush with the WRIST barrel's measured Ø66.97,
+       so the bracket blends into the wrist profile just above the gripper
+       flange. That flush match is what identifies the intended axial seat.
+
+       The camera sits on a pad tilted exactly 30 deg from the gripper axis
+       (pad normal (0,-0.5,-0.866) in the bracket frame, 5.5 mm thick, carrying
+       2 x Ø3.2 M3 clearance holes 20 mm apart), so the D405 looks along the
+       gripper axis canted 30 deg inward, toward the grasp region.
+
+     THE D405 mesh is Intel's own CAD and measures 42.0 x 23.0 x 42.0 mm -
+     exactly the published D405 size. Its optical axis is Y in its own frame.
+     ⚠ The LENS is the y = -0.07 face and the MOUNTING face is y = -23.03 -
+     i.e. the lens is on the face with the LARGER flat area. Do not infer it the
+     other way round from planar area (an earlier pass did, which put the lens
+     against the bracket); the operator caught it in RViz.
+
+     THE THREE UNKNOWNS - 1 and 2 are now MEASURED; only 3 is still open:
+       1. ✅ CLOCKING (${side}_wrist_camera_yaw), CLOSED. A clamp saddle goes on at ANY
+          angle about the gripper axis; nothing in the CAD fixes it. Set from
+          the operator's observation that with every arm joint at ZERO the
+          mounts sit at the robot's far left / far right, i.e. the camera points
+          OUTBOARD: that is gripper -X on both arms, so both take yaw = -pi/2.
+          ⚠ The operator also reports both signal ports face robot-left, which
+          would fix the roll too - but that is only meaningful relative to the
+          wrist roll angle and is unconfirmed against hardware.
+       2. ✅ AXIAL SEAT - CLOSED, measured. The gripper body
+          carries FOUR radial M3 holes in its cylinder, at theta = +/-43.8 and
+          +/-136.0 deg, all at z = 9.4 mm (bore r 28.6 -> 24.63, ~4 mm deep).
+          The saddle's 2 clamp screws sit at mount z=5, so the joint origin is
+          9.4 + 5 = 14.4 mm and the saddle spans gripper z = 4.4..14.4 with its
+          screws on the hole centres.
+          ⭐ Those holes also CONFIRM THE CLOCKING independently: the mount's
+          two screws are 90 deg apart and at yaw=-pi/2 they land on the
+          +/-136 deg pair, which straddles gripper -X = outboard. The +/-44 deg
+          pair is the same bracket fitted INBOARD - the wrong side.
+       3. 🔴 STILL OPEN - THE CAMERA BOLT PATTERN DOES NOT CROSS-CHECK. The pad's M3 holes are
+          20 mm apart; the D405 CAD's own M3 holes measure 15.5 and 23.5 mm.
+          The camera is therefore placed CENTRED ON THE PAD'S HOLE AXIS, which
+          gets the pose right regardless, but the actual screws are unresolved.
+
+     ⚠ ${side}_wrist_camera_optical_frame is the FRONT FACE CENTRE with the ROS
+     optical convention (z forward, x right, y down). It is NOT a calibrated
+     optical centre - the D405's depth origin sits at one imager, and the SDK
+     exposes intrinsics but no extrinsics (see 6.7). Calibrate before using it
+     for perception.
+     ===================================================================== -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- side : "left" / "right" ; yaw : clocking about the gripper axis, rad -->
+  <xacro:macro name="moz1_wrist_camera" params="side yaw:=0">
+
+    <!-- ================= bracket ================= -->
+    <!-- rpy=(pi,0,yaw): the saddle's own +Z runs from its seat back toward the
+         wrist, so it mounts flipped; the camera pad then faces the fingers.
+         Without the flip the pad would point back into the arm. -->
+    <link name="${side}_wrist_camera_mount_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://moz1_description/meshes/wrist_camera_mount.STL"/>
+        </geometry>
+        <material name="moz1_grey"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://moz1_description/meshes/wrist_camera_mount.STL"/>
+        </geometry>
+      </collision>
+    </link>
+    <joint name="${side}_wrist_camera_mount_joint" type="fixed">
+      <origin xyz="0 0 0.0144" rpy="${pi} 0 ${yaw}"/>
+      <parent link="${side}_gripper_base_link"/>
+      <child  link="${side}_wrist_camera_mount_link"/>
+    </joint>
+
+    <!-- ================= D405 body ================= -->
+    <!-- The LINK FRAME is the camera's MOUNTING face centre (mesh y=-23.03) -
+         the surface that actually bolts to the pad - so it is a meaningful
+         datum; the mesh is shifted into place in <visual> instead. The joint
+         origin is the pad point on the bracket, and rpy=(-2pi/3,0,0) turns the
+         camera's +Y (its optical axis, lens outward) onto the pad normal.
+         That is the pi/3 orientation flipped 180 deg about X. X is the only
+         axis the flip may use: the camera's own mounting holes run along its X,
+         as do the pad's, so flipping about Z instead would misalign the screws.
+         The camera body occupies the same slab either way - only which face
+         touches the pad changes - so the aim is unaffected.
+         Collision is a 42x23x42 box on purpose: the vendor mesh is 42809
+         triangles of internal detail and would cost far more in collision
+         checking than a camera housing is worth. -->
+    <link name="${side}_wrist_camera_link">
+      <visual>
+        <origin xyz="0.00552 0.02303 -0.040" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://moz1_description/meshes/wrist_camera_d405.STL"/>
+        </geometry>
+        <material name="moz1_sensor"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0.01146 0" rpy="0 0 0"/>
+        <geometry><box size="0.042 0.023 0.042"/></geometry>
+      </collision>
+    </link>
+    <joint name="${side}_wrist_camera_joint" type="fixed">
+      <origin xyz="0 0.072424 -0.010754" rpy="${-2*pi/3} 0 0"/>
+      <parent link="${side}_wrist_camera_mount_link"/>
+      <child  link="${side}_wrist_camera_link"/>
+    </joint>
+
+    <!-- ================= optical frame ================= -->
+    <link name="${side}_wrist_camera_optical_frame"/>
+    <joint name="${side}_wrist_camera_optical_joint" type="fixed">
+      <origin xyz="0 0.02296 0" rpy="${-pi/2} 0 0"/>
+      <parent link="${side}_wrist_camera_link"/>
+      <child  link="${side}_wrist_camera_optical_frame"/>
+    </joint>
+
+    <!-- ================= Aruco optical frame ================= -->
+    <link name="cam_${side}_wrist_color_optical_frame"/>
+    <joint name="cam_${side}_wrist_color_optical_joint" type="fixed">
+      <origin xyz="-0.007 0.02096 -0.005" rpy="${(-pi/2)+(0.017453*5)} 0 0"/>
+      <parent link="${side}_wrist_camera_link"/>
+      <child link="cam_${side}_wrist_color_optical_frame"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

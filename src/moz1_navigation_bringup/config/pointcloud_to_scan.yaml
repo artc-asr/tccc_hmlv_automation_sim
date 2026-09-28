@@ -1,0 +1,35 @@
+pointcloud_to_laserscan:
+  ros__parameters:
+    target_frame: base_link
+    transform_tolerance: 0.05
+
+    # MID360 is a 3D LiDAR; we project a horizontal slice around the base height.
+    # Tune min_height/max_height after measuring the actual LiDAR mount in
+    # docs/setup.md. -0.15 keeps a small margin above the floor; 0.35 caps near
+    # the robot's "hip" so dangling arms don't pollute the scan.
+    min_height: -0.15
+    max_height: 0.35
+
+    angle_min: -3.14159
+    angle_max: 3.14159
+    angle_increment: 0.0087
+    scan_time: 0.1
+
+    range_min: 0.2
+    range_max: 20.0
+
+    use_inf: true
+    inf_epsilon: 1.0
+
+    # Publish /scan with RELIABLE QoS. The node defaults to SensorDataQoS
+    # (BEST_EFFORT), but slam_toolbox and Nav2 both subscribe with RELIABLE.
+    # Without this override we get "New subscription discovered on topic
+    # '/scan', requesting incompatible QoS" and the downstream consumers
+    # silently see nothing.
+    qos_overrides:
+      /scan:
+        publisher:
+          reliability: reliable
+          durability: volatile
+          history: keep_last
+          depth: 10

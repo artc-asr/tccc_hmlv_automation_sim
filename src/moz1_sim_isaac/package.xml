@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>moz1_sim_isaac</name>
+  <version>0.1.0</version>
+  <description>
+    Isaac Sim 5.1.0 side of the Moz1 sim integration. Paste-into-Script-Editor
+    OmniGraph attach scripts that make the Spirit AI Moz1 simulation present the
+    SAME ROS2 contract as the real robot's embedded controller + Livox driver
+    (the controller at 172.16.0.20 is the DDS publisher; MovaX is a TCP operator
+    console, not a ROS node): /livox/lidar,
+    /livox/imu, /joint_states, /odom, /tf (sim -> stack) and /cmd_vel,
+    /joint_command (stack -> sim). These scripts run inside the Isaac Sim Python
+    (omni.*), not on the ROS2 host; they are installed to share/ for reference.
+  </description>
+  <maintainer email="asr.mobilemanipulation@gmail.com">Moz1 Sim</maintainer>
+  <license>MIT</license>
+
+  <!-- Runtime deps are only used by the optional host-side helpers; the
+       isaac_scripts themselves run in the Isaac container's interpreter. -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

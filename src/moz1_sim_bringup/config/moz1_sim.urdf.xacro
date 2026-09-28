@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<!-- ========================================================================
+     moz1_sim.urdf.xacro  (moz1_sim_bringup)
+
+     Sim variant of moz1_moveit_config/config/moz1.urdf.xacro. IDENTICAL robot
+     geometry and IDENTICAL ros2_control joint set, but the hardware plugin is
+     swapped from mock_components/GenericSystem to
+     topic_based_ros2_control/TopicBasedSystem so the controllers exchange state
+     and commands with Isaac Sim over ROS2 topics instead of looping internally:
+
+       * the hardware SUBSCRIBES joint state on  joint_states_topic  = /joint_states
+         (canonical names; produced by Isaac -> joint_name_remap)
+       * the hardware PUBLISHES commands on      joint_commands_topic = /joint_command
+         (canonical names; joint_name_remap -> Isaac applies to the articulation)
+
+     This keeps moz1_moveit_config's controllers, SRDF, kinematics and joint
+     limits byte-identical between sim and real; only the hardware backing
+     changes. Real execution still goes through moz1_moveit_bridge (the SDK),
+     never through this file.
+     ===================================================================== -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="moz1">
+
+  <!-- Same CAD-faithful description used by the real MoveIt config. -->
+  <xacro:include filename="$(find moz1_description)/urdf/moz1.urdf.xacro"/>
+
+  <!-- A position-commanded joint that also reports velocity state. -->
+  <xacro:macro name="sim_joint" params="name init">
+    <joint name="${name}">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">${init}</param>
+      </state_interface>
+      <state_interface name="velocity">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+    </joint>
+  </xacro:macro>
+
+  <ros2_control name="moz1_sim_system" type="system">
+    <hardware>
+      <!-- Mirrors commands/states over topics to Isaac Sim. No SDK, no MovaX. -->
+      <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+      <param name="joint_commands_topic">/joint_command</param>
+      <param name="joint_states_topic">/joint_states</param>
+      <!-- Command interfaces this HW writes out (position-controlled arms). -->
+      <param name="sum_wrapped_joint_states">false</param>
+    </hardware>
+
+    <!-- Torso (held at home; no controller commands it in v1). Home pose
+         (deg [0, 60, -90, 30, 0, 0]) from the robot's home_joint_states.yaml /
+         robot.yaml — keep in sync with that source of truth and with
+         moz1_sim_gazebo/config/moz1_gazebo.urdf.xacro. -->
+    <xacro:sim_joint name="LegWaist-0" init="0.0"/>
+    <xacro:sim_joint name="LegWaist-1" init="1.0471975512"/>
+    <xacro:sim_joint name="LegWaist-2" init="-1.5707963268"/>
+    <xacro:sim_joint name="LegWaist-3" init="0.5235987756"/>
+    <xacro:sim_joint name="LegWaist-4" init="0.0"/>
+    <xacro:sim_joint name="LegWaist-5" init="0.0"/>
+
+    <!-- Left arm (home pose). -->
+    <xacro:sim_joint name="LeftArm-0" init="-0.1570796327"/>
+    <xacro:sim_joint name="LeftArm-1" init="-0.8726646260"/>
+    <xacro:sim_joint name="LeftArm-2" init="-0.3490658504"/>
+    <xacro:sim_joint name="LeftArm-3" init="-1.5707963268"/>
+    <xacro:sim_joint name="LeftArm-4" init="-0.6108652381"/>
+    <xacro:sim_joint name="LeftArm-5" init="0.1396263402"/>
+    <xacro:sim_joint name="LeftArm-6" init="-0.1221730476"/>
+
+    <!-- Right arm (home pose). -->
+    <xacro:sim_joint name="RightArm-0" init="0.1570796327"/>
+    <xacro:sim_joint name="RightArm-1" init="-0.8726646260"/>
+    <xacro:sim_joint name="RightArm-2" init="0.3490658504"/>
+    <xacro:sim_joint name="RightArm-3" init="1.5707963268"/>
+    <xacro:sim_joint name="RightArm-4" init="0.6108652381"/>
+    <xacro:sim_joint name="RightArm-5" init="0.1396263402"/>
+    <xacro:sim_joint name="RightArm-6" init="0.1221730476"/>
+
+    <!-- PLACEHOLDER grippers (open ~0.03 m of the unverified 0..0.06 stroke). -->
+    <xacro:sim_joint name="left_gripper_joint"  init="0.03"/>
+    <xacro:sim_joint name="right_gripper_joint" init="0.03"/>
+  </ros2_control>
+
+</robot>

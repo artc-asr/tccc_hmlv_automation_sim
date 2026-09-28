@@ -1,0 +1,151 @@
+<?xml version="1.0"?>
+<!-- ========================================================================
+     moz1_arm_macros.xacro - 7-DOF arm macro for the Moz1.
+
+     Geometry, joint axes and joint limits below are taken VERBATIM from the
+     official CAD export at spirit01_model/urdf/moz1.urdf (joints LeftArm-0..6
+     and RightArm-0..6). The two arms share an identical kinematic chain; only
+     the shoulder mount transform and joints 0 & 3 limits are mirrored, so
+     those are passed in as macro parameters.
+
+     >>> VERIFY-BEFORE-HARDWARE <<<
+       * Joint NAMES (LeftArm-N / RightArm-N) match the SDK joint order used by
+         leftarm_cmd_joint_pos / rightarm_cmd_joint_pos. This mapping is
+         asserted in moz1_moveit_bridge/config/trajectory_bridge.yaml and MUST
+         be re-confirmed against the live SDK before any real motion.
+       * effort / velocity were 0 (unset) in the CAD URDF. The placeholder
+         values here exist only so MoveIt can time-parameterize trajectories;
+         real limits live in moz1_moveit_config/config/joint_limits.yaml.
+     ===================================================================== -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Placeholder actuator limits (NOT official). MoveIt's joint_limits.yaml
+       is the authoritative velocity/accel source for planning. -->
+  <xacro:property name="arm_joint_effort"   value="50.0"/>
+  <xacro:property name="arm_joint_velocity" value="1.0"/>
+
+  <!-- One arm.
+       side    : "left" / "right"  (selects mesh + link names: left01.. / right01..)
+       jprefix : "LeftArm" / "RightArm"  (real SDK-matching joint name prefix)
+       mesh_rpy: visual/collision mesh orientation ("0 0 0" L, "0 0 -3.14159265359" R)
+       mount_* : transform from waist03 to the shoulder (joint -0 origin)
+       j0_/j3_ : the two mirrored joint limits (rad) -->
+  <xacro:macro name="moz1_arm"
+               params="side jprefix mesh_rpy mount_xyz mount_rpy
+                       j0_lower j0_upper j3_lower j3_upper">
+
+    <!-- helper: one arm link with its CAD mesh -->
+    <xacro:macro name="arm_link" params="name">
+      <link name="${name}">
+        <visual>
+          <origin xyz="0 0 0" rpy="${mesh_rpy}"/>
+          <geometry>
+            <mesh filename="package://moz1_description/meshes/${name}.STL"/>
+          </geometry>
+          <material name="moz1_grey"/>
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="${mesh_rpy}"/>
+          <geometry>
+            <mesh filename="package://moz1_description/meshes/${name}.STL"/>
+          </geometry>
+        </collision>
+      </link>
+    </xacro:macro>
+
+    <xacro:arm_link name="${side}01"/>
+    <xacro:arm_link name="${side}02"/>
+    <xacro:arm_link name="${side}03"/>
+    <xacro:arm_link name="${side}04"/>
+    <xacro:arm_link name="${side}05"/>
+    <xacro:arm_link name="${side}06"/>
+    <xacro:arm_link name="${side}07"/>
+
+    <!-- J0 : shoulder mount on waist03 (mirrored) -->
+    <joint name="${jprefix}-0" type="revolute">
+      <origin xyz="${mount_xyz}" rpy="${mount_rpy}"/>
+      <parent link="waist03"/>
+      <child  link="${side}01"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="${j0_lower}" upper="${j0_upper}"
+             effort="${arm_joint_effort}" velocity="${arm_joint_velocity}"/>
+    </joint>
+
+    <joint name="${jprefix}-1" type="revolute">
+      <origin xyz="0.079 0 0" rpy="0 0 0"/>
+      <parent link="${side}01"/>
+      <child  link="${side}02"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-2.967059728" upper="0.157079633"
+             effort="${arm_joint_effort}" velocity="${arm_joint_velocity}"/>
+    </joint>
+
+    <joint name="${jprefix}-2" type="revolute">
+      <origin xyz="0 0 -0.113" rpy="0 0 0"/>
+      <parent link="${side}02"/>
+      <child  link="${side}03"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.054326191" upper="3.054326191"
+             effort="${arm_joint_effort}" velocity="${arm_joint_velocity}"/>
+    </joint>
+
+    <!-- J3 : elbow (mirrored) -->
+    <joint name="${jprefix}-3" type="revolute">
+      <origin xyz="0 0 -0.187" rpy="0 0 0"/>
+      <parent link="${side}03"/>
+      <child  link="${side}04"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="${j3_lower}" upper="${j3_upper}"
+             effort="${arm_joint_effort}" velocity="${arm_joint_velocity}"/>
+    </joint>
+
+    <joint name="${jprefix}-4" type="revolute">
+      <origin xyz="0 0 -0.101" rpy="0 0 0"/>
+      <parent link="${side}04"/>
+      <child  link="${side}05"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.054326191" upper="3.054326191"
+             effort="${arm_joint_effort}" velocity="${arm_joint_velocity}"/>
+    </joint>
+
+    <joint name="${jprefix}-5" type="revolute">
+      <origin xyz="0 0 -0.159" rpy="0 0 0"/>
+      <parent link="${side}05"/>
+      <child  link="${side}06"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-1.658062789" upper="1.658062789"
+             effort="${arm_joint_effort}" velocity="${arm_joint_velocity}"/>
+    </joint>
+
+    <joint name="${jprefix}-6" type="revolute">
+      <origin xyz="0 0 -0.0905" rpy="0 0 0"/>
+      <parent link="${side}06"/>
+      <child  link="${side}07"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="-1.570796327" upper="1.570796327"
+             effort="${arm_joint_effort}" velocity="${arm_joint_velocity}"/>
+    </joint>
+
+    <!-- ==================================================================
+         END-EFFECTOR FRAME  (PLACEHOLDER OFFSET - VERIFY BEFORE HARDWARE)
+         left07 / right07 is the wrist flange. left_ee_link / right_ee_link is
+         the MoveIt IK tip. The -Z offset below is a guess for the tool point;
+         measure the real flange-to-TCP distance and update.
+         ================================================================== -->
+    <link name="${side}_ee_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><sphere radius="0.012"/></geometry>
+        <material name="moz1_placeholder"/>
+      </visual>
+    </link>
+    <joint name="${side}_ee_fixed_joint" type="fixed">
+      <!-- TODO(hardware): replace with measured flange->TCP transform -->
+      <origin xyz="0 0 -0.05" rpy="0 0 0"/>
+      <parent link="${side}07"/>
+      <child  link="${side}_ee_link"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

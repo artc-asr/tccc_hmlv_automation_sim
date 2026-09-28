@@ -1,0 +1,57 @@
+# servo.yaml - MoveIt Servo configuration for the LEFT arm (PRD §9.5).
+#
+# >>> VERSION 1: CONFIG ONLY. Do NOT run Servo against the real robot. <<<
+# Servo output here is published as a JointTrajectory on a topic; nothing is
+# wired to hardware. Real reactive control must wait until moz1_moveit_bridge
+# is validated. Velocity limits are deliberately tiny.
+#
+# Parameters follow moveit_servo (Humble). Re-tune scales/limits before any
+# real-robot or even mock teleop session.
+###############################################################################
+moveit_servo:
+  ros__parameters:
+    use_gazebo: false
+    move_group_name: left_arm        # start with the left arm only (PRD)
+    planning_frame: waist3            # overwritten at load to the group base
+    ee_frame_name: left_ee_link
+    robot_link_command_frame: waist3
+
+    command_in_type: "speed_units"    # twist in m/s & rad/s
+    scale:
+      linear: 0.05                    # VERY slow (m/s) - placeholder
+      rotational: 0.2                 # rad/s - placeholder
+      joint: 0.3
+
+    # Input / output topics.
+    cartesian_command_in_topic: ~/delta_twist_cmds
+    joint_command_in_topic: ~/delta_joint_cmds
+    command_out_topic: /left_arm_controller/joint_trajectory
+    command_out_type: trajectory_msgs/JointTrajectory
+    publish_joint_positions: true
+    publish_joint_velocities: false
+    publish_joint_accelerations: false
+
+    status_topic: ~/status
+    # /moz1/joint_states, not /joint_states: the robot also publishes the latter with a
+    # clock ~123 s ahead. Servo would inherit the skew directly. §12.24.
+    joint_topic: /moz1/joint_states
+
+    publish_period: 0.034             # ~30 Hz
+    low_latency_mode: false
+
+    # ---- Safety: collision + singularity checking ON (PRD §9.5) ----
+    check_collisions: true
+    collision_check_rate: 10.0
+    self_collision_proximity_threshold: 0.01
+    scene_collision_proximity_threshold: 0.02
+    lower_singularity_threshold: 17.0
+    hard_stop_singularity_threshold: 30.0
+    leaving_singularity_threshold_multiplier: 2.0
+
+    # ---- Conservative joint-limit margins ----
+    joint_limit_margin: 0.1
+    halt_all_joints_in_joint_mode: true
+    halt_all_joints_in_cartesian_mode: true
+
+    incoming_command_timeout: 0.1
+    num_outgoing_halt_msgs_to_publish: 4

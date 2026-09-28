@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.8)
+project(moz1_description)
+
+find_package(ament_cmake REQUIRED)
+
+# Install the description assets so package:// URIs and $(find ...) resolve.
+install(
+  DIRECTORY urdf meshes launch rviz config
+  DESTINATION share/${PROJECT_NAME}
+)
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_package()

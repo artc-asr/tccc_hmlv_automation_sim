@@ -1,0 +1,415 @@
+# Nav2 (Humble) parameters tuned for Moz1 + Livox MID360 + /scan from
+# pointcloud_to_laserscan. Conservative velocity / acceleration limits because
+# the bridge currently defaults to dry-run; live limits are also enforced by
+# spiritai/safety.py / config/robot.yaml on the SDK side.
+#
+# Topology assumptions:
+#   * /scan          sensor_msgs/LaserScan  from pointcloud_to_laserscan
+#   * map -> odom    from slam_toolbox (mapping mode)
+#   * odom -> base_link  from moz1_nav_bridge/odom_publisher (publish_tf=true)
+#   * base_link -> livox_frame  static TF from livox_bringup.launch.py
+#
+# AMCL is NOT used here -- we run slam_toolbox concurrently for the map
+# transform. If you want to localize against a saved map later, swap to
+# nav2_bringup's localization_launch.py + an amcl_params snippet.
+
+bt_navigator:
+  ros__parameters:
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odom
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    # Point at Nav2's stock BT XMLs that ship in apt. Empty strings do
+    # NOT fall back to built-in defaults in Humble; bt_navigator throws
+    # "Behavior tree threw exception: Empty Tree" instead and the goal
+    # aborts. These paths come with ros-humble-nav2-bt-navigator.
+    default_nav_to_pose_bt_xml: /opt/ros/humble/share/nav2_bt_navigator/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml
+    default_nav_through_poses_bt_xml: /opt/ros/humble/share/nav2_bt_navigator/behavior_trees/navigate_through_poses_w_replanning_and_recovery.xml
+    plugin_lib_names:
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_compute_path_through_poses_action_bt_node
+      - nav2_smooth_path_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_spin_action_bt_node
+      - nav2_wait_action_bt_node
+      - nav2_assisted_teleop_action_bt_node
+      - nav2_back_up_action_bt_node
+      - nav2_drive_on_heading_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_stuck_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_goal_updated_condition_bt_node
+      - nav2_globally_updated_goal_condition_bt_node
+      - nav2_is_path_valid_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_reinitialize_global_localization_service_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_distance_controller_bt_node
+      - nav2_speed_controller_bt_node
+      - nav2_truncate_path_action_bt_node
+      - nav2_truncate_path_local_action_bt_node
+      - nav2_goal_updater_node_bt_node
+      - nav2_recovery_node_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - nav2_round_robin_node_bt_node
+      - nav2_transform_available_condition_bt_node
+      - nav2_time_expired_condition_bt_node
+      - nav2_path_expiring_timer_condition
+      - nav2_distance_traveled_condition_bt_node
+      - nav2_single_trigger_bt_node
+      - nav2_goal_updated_controller_bt_node
+      - nav2_is_battery_low_condition_bt_node
+      - nav2_navigate_through_poses_action_bt_node
+      - nav2_navigate_to_pose_action_bt_node
+      - nav2_remove_passed_goals_action_bt_node
+      - nav2_planner_selector_bt_node
+      - nav2_controller_selector_bt_node
+      - nav2_goal_checker_selector_bt_node
+      - nav2_controller_cancel_bt_node
+      - nav2_path_longer_on_approach_bt_node
+      - nav2_wait_cancel_bt_node
+      - nav2_spin_cancel_bt_node
+      - nav2_back_up_cancel_bt_node
+      - nav2_assisted_teleop_cancel_bt_node
+      - nav2_drive_on_heading_cancel_bt_node
+      - nav2_is_battery_charging_condition_bt_node
+
+controller_server:
+  ros__parameters:
+    use_sim_time: false
+    controller_frequency: 20.0
+    # The Moz1 is omnidirectional: vy is a real degree of freedom, NOT noise.
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      # Was 0.5 m / 10 s -- too strict. Goals shorter than 0.5 m would never
+      # trigger "progress" and got aborted before reaching. 0.1 m / 20 s is
+      # generous (robot only needs to move 10 cm every 20 s to count as
+      # progressing) but still catches actual stalls.
+      required_movement_radius: 0.10
+      movement_time_allowance: 20.0
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+
+    # MPPI (Model Predictive Path Integral) controller. Selected over DWB
+    # because the Moz1 is a holonomic / omnidirectional base, and MPPI
+    # samples 3D (vx, vy, wz) trajectories natively. DWB needs ad-hoc
+    # critic tweaks to behave well on holonomic bases.
+    #
+    # Velocity envelope is conservative (matches v3 limits and the bridge's
+    # config/robot.yaml base_limits). Tune up only after live motion tests.
+    FollowPath:
+      plugin: "nav2_mppi_controller::MPPIController"
+      time_steps: 56
+      model_dt: 0.05
+      batch_size: 1000
+      vx_std: 0.20
+      vy_std: 0.20
+      wz_std: 0.40
+      # Take MPPI to the robot.yaml caps. Verified safe via
+      # test_smooth_base_cmd --raw --constant-vx 0.20 (smooth at 0.20; 0.30
+      # is the hard cap in config/robot.yaml::base_limits). The previous
+      # 0.20 cap meant MPPI rarely commanded more than ~0.10 m/s in the
+      # cruise phase, which is what produced the "5 cm hop" feel.
+      vx_max: 0.30
+      vx_min: -0.30
+      vy_max: 0.20
+      wz_max: 0.60
+      # Accel caps bumped to 2.0/4.0 -- 0 -> 0.30 in 0.15 s, well above
+      # whatever engagement speed the wheels need but still 2.5x below
+      # safety_limiter's 5.0 m/s^2 hard cap.
+      ax_max: 2.0
+      ax_min: -2.0
+      ay_max: 2.0
+      az_max: 4.0
+      iteration_count: 1
+      prune_distance: 1.7
+      transform_tolerance: 0.1
+      # Higher temperature = MPPI mixes more trajectories instead of locking
+      # onto the single best one each tick -> smoother control, slightly
+      # slower to react. 0.3 was too sharp and produced visible velocity
+      # jitter; 0.5 keeps the same goal-tracking with notably smoother
+      # rollouts in tests.
+      temperature: 0.5
+      gamma: 0.015
+      motion_model: "Omni"
+      visualize: false
+      reset_period: 1.0
+      regenerate_noises: false
+      TrajectoryVisualizer:
+        trajectory_step: 5
+        time_step: 3
+      AckermannConstraints:
+        min_turning_r: 0.0
+      critics:
+        ["ConstraintCritic", "ObstaclesCritic", "GoalCritic",
+         "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic",
+         "PathAngleCritic", "PreferForwardCritic"]
+      ConstraintCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 4.0
+      GoalCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        threshold_to_consider: 1.4
+      GoalAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.0
+        threshold_to_consider: 0.5
+      ObstaclesCritic:
+        enabled: true
+        cost_power: 1
+        repulsion_weight: 1.5
+        critical_weight: 20.0
+        consider_footprint: false
+        collision_cost: 10000.0
+        collision_margin_distance: 0.10
+        near_goal_distance: 0.5
+      PathAlignCritic:
+        enabled: true
+        cost_power: 1
+        # Was 14.0 -- aggressive path-hugging that made the controller
+        # over-correct around corners and produced jagged paths. 8.0 still
+        # tracks the global plan but lets MPPI take smoother shortcuts
+        # through wide free space.
+        cost_weight: 8.0
+        max_path_occupancy_ratio: 0.05
+        trajectory_point_step: 4
+        threshold_to_consider: 0.5
+        offset_from_furthest: 20
+        use_path_orientations: false
+      PathFollowCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        offset_from_furthest: 5
+        threshold_to_consider: 1.4
+      PathAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 2.0
+        offset_from_furthest: 4
+        threshold_to_consider: 0.5
+        max_angle_to_furthest: 1.0
+        forward_preference: false      # holonomic base -- no forward preference
+      # PreferForwardCritic disabled in holonomic mode: it would discourage
+      # strafe / sideways motion which is normal for the Moz1.
+      PreferForwardCritic:
+        enabled: false
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_link
+      use_sim_time: false
+      rolling_window: true
+      width: 4
+      height: 4
+      resolution: 0.05
+      # Conservative radius for the humanoid base. Re-measure once the
+      # physical footprint is known and switch to a polygon footprint.
+      robot_radius: 0.45
+      # 3D obstacle perception from FAST-LIO2's PER-SCAN body-frame cloud.
+      # Voxel layer marks/unmarks cells from a 3D voxel grid built from
+      # each PointCloud2 frame. Unlike obstacle_layer + LaserScan, this
+      # uses the MID360's full vertical FOV (-7° to +52°), so things at
+      # arbitrary heights (table edges, hanging fixtures, low chairs)
+      # show up.
+      plugins: ["voxel_layer", "inflation_layer"]
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        # 16 z-slices × 0.05 m = 0.8 m vertical band tracked in voxels.
+        # Mark a 2D cell as occupied if any voxel in its column is hit.
+        z_voxels: 16
+        z_resolution: 0.05
+        origin_z: 0.0
+        mark_threshold: 0
+        unknown_threshold: 15
+        publish_voxel_map: true
+        combination_method: 1   # 1 = max (newer marks override clears)
+        footprint_clearing_enabled: true
+        observation_sources: cloud
+        cloud:
+          # /cloud_registered_body is FAST-LIO2's LATEST scan transformed
+          # into the IMU/body frame (≡ base_link via our static TF).
+          # Per-scan -> clearing works naturally; obstacles disappear when
+          # the LiDAR no longer sees them.
+          topic: /cloud_registered_body
+          sensor_frame: body
+          data_type: "PointCloud2"
+          marking: true
+          clearing: true
+          # Ignore floor (~ground level) and ceiling. Floor returns below
+          # this become unmarked free space rather than walls.
+          min_obstacle_height: 0.10
+          max_obstacle_height: 2.00
+          obstacle_max_range: 8.0
+          obstacle_min_range: 0.0
+          raytrace_max_range: 10.0
+          raytrace_min_range: 0.0
+          inf_is_valid: false
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55
+      always_send_full_costmap: true
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      use_sim_time: false
+      robot_radius: 0.45
+      resolution: 0.05
+      track_unknown_space: true
+      # Global plan uses the saved 2D map (static_layer) plus a 3D voxel
+      # layer of live obstacles (so dynamic things like people / moved
+      # furniture get planned around). Same cloud source as local_costmap.
+      plugins: ["static_layer", "voxel_layer", "inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        z_voxels: 16
+        z_resolution: 0.05
+        origin_z: 0.0
+        mark_threshold: 0
+        unknown_threshold: 15
+        publish_voxel_map: false   # disable in global to save bandwidth
+        combination_method: 1
+        footprint_clearing_enabled: true
+        observation_sources: cloud
+        cloud:
+          topic: /cloud_registered_body
+          sensor_frame: body
+          data_type: "PointCloud2"
+          marking: true
+          clearing: true
+          min_obstacle_height: 0.10
+          max_obstacle_height: 2.00
+          obstacle_max_range: 8.0
+          obstacle_min_range: 0.0
+          raytrace_max_range: 10.0
+          raytrace_min_range: 0.0
+          inf_is_valid: false
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55
+      always_send_full_costmap: true
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 1.0
+    use_sim_time: false
+    planner_plugins: ["GridBased"]
+    # SmacPlanner2D instead of NavfnPlanner: A* on the 2D costmap with a
+    # smoother integrated into the planner output. Produces much smoother
+    # paths than Navfn's Dijkstra (which lays them on grid edges, creating
+    # the 45-degree zigzags MPPI then has to chase). Same plugin name
+    # "GridBased" so bt_navigator's BT XML doesn't need updates.
+    GridBased:
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      tolerance: 0.5
+      downsample_costmap: false
+      downsampling_factor: 1
+      allow_unknown: true
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 2.0
+      motion_model_for_search: "MOORE"   # 8-connected grid (omni-friendly)
+      cost_travel_multiplier: 2.0
+      smooth_path: true                  # SmacPlanner2D's internal smoother
+      smoother:
+        max_iterations: 1000
+        w_smooth: 0.3
+        w_data: 0.2
+        tolerance: 1.0e-10
+
+smoother_server:
+  ros__parameters:
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 1000
+      do_refinement: True
+
+behavior_server:
+  ros__parameters:
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    assisted_teleop:
+      plugin: "nav2_behaviors/AssistedTeleop"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+    local_frame: odom
+    global_frame: map
+    robot_base_frame: base_link
+    transform_tolerance: 0.1
+    use_sim_time: false
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 0.3
+    min_rotational_vel: 0.05
+    rotational_acc_lim: 0.5
+
+waypoint_follower:
+  ros__parameters:
+    loop_rate: 20
+    stop_on_failure: false
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: true
+      waypoint_pause_duration: 200
+
+velocity_smoother:
+  ros__parameters:
+    smoothing_frequency: 20.0
+    scale_velocities: false
+    feedback: "OPEN_LOOP"
+    # Match MPPI's vx_max / vy_max / wz_max. Anything tighter throttles
+    # MPPI's commanded velocity and produces the "5 cm hop" feel. 0.30 m/s
+    # is the hard cap in config/robot.yaml::base_limits.
+    max_velocity: [0.30, 0.20, 0.60]
+    min_velocity: [-0.30, -0.20, -0.60]
+    # Accel: 2.0 m/s^2 lin / 4.0 rad/s^2 ang. Wheels handle a 0 -> 0.30 step
+    # instantly per the --raw test bench, so the ramp here is purely for
+    # MPPI tracking stability. safety_limiter at 5.0 m/s^2 is the floor.
+    max_accel: [2.0, 2.0, 4.0]
+    max_decel: [-2.0, -2.0, -4.0]
+    odom_topic: "odom"
+    odom_duration: 0.1
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0
