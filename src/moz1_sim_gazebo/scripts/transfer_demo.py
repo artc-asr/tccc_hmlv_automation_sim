@@ -53,7 +53,8 @@ TORSO = [f"LegWaist-{i}" for i in range(6)]
 # a static sum over the links says, for the filled pair (2 × 4.2 kg):
 #   home + hands 0.53 m out  hip 81 N·m    → it folded while driving
 #   carry                    hip 48, knee 7, waist 52 N·m (hips back, chest upright)
-#   placing on the deck: deep 77, low_lean 79, lean75 93 N·m at the hip
+#   placing on the deck: low_lean 79, lean75 93 N·m at the hip (deep 77, but see
+#   DECK_TORSOS)
 TORSO_PRESETS = {
     "home": [0, 60, -90, 30, 0, 0],
     "lean45": [0, 60, -90, 45, 0, 0],
@@ -64,7 +65,11 @@ TORSO_PRESETS = {
     "carry": [0, 50, -100, 40, 0, 0],
 }
 PICK_TORSOS = ["home", "lean45", "lean60", "lean75"]      # least lean first
-DECK_TORSOS = ["deep", "low_lean", "lean75"]              # least hip torque first
+# Placing on the deck, loaded. Not "deep": with 8.4 kg in hand the arms can't hold
+# the planned path in that crouch (they sag, the controller aborts) and the held
+# cans are driven down through the pallet deck before it gives up; low_lean has
+# placed cleanly every run.
+DECK_TORSOS = ["low_lean", "lean75"]
 ARM_JOINTS = {s: [f"{s.capitalize()}Arm-{i}" for i in range(7)] for s in SIDES}
 
 
@@ -519,15 +524,42 @@ class TransferDemo(JerrycanDemo):
                                  quats, f"the lift off the {where} spot")
 
     def place_pair(self, names, slots, quats, what):
-        """From above `slots` (can-bottom gz positions): down, release, up; verify."""
-        place = {s: self.grasp_pose((slots[s][0], slots[s][1], slots[s][2] + 0.003))
+        """From above `slots` (can-bottom gz positions): guarded descent, release,
+        up; verify.
+
+        Guarded: loaded, the arms and torso sit a little lower than commanded
+        (and more so crouched with 8.4 kg), and the held can goes wherever the hand
+        is — so a descent to the nominal height pushed the can's bottom into the
+        pallet deck. The descent stops 3 cm short, measures where each can's
+        bottom really is (Gazebo), and corrects the rest by that error (twice)."""
+        gap = 0.003                             # can bottom above the surface at release
+        place = {s: list(self.grasp_pose((slots[s][0], slots[s][1], slots[s][2] + gap)))
                  for s in SIDES}
-        self.dual_straight(place, quats)
+        stand_off = 0.03
+        target = {s: (p[0], p[1], p[2] + stand_off) for s, p in place.items()}
+        for step in range(3):
+            self.dual_straight(target, quats, 0.1 if step else 0.15)
+            now = self.gz_model_positions()
+            want = stand_off if step == 0 else 0.0
+            errs = {}
+            for s in SIDES:
+                got = now.get(names[s])
+                if got is None:
+                    raise StepFailed(f"{names[s]}: no pose from Gazebo while placing")
+                # + = the can sits higher than wanted, - = lower (would go into the surface)
+                errs[s] = got[2] - (slots[s][2] + gap + want)
+            self.get_logger().info(
+                f"placing on the {what}: can bottoms " + ", ".join(
+                    f"{s} {errs[s] * 1000:+.0f} mm" for s in SIDES)
+                + (" vs 3 cm above" if step == 0 else " vs the release height"))
+            if step > 0 and all(abs(e) < 0.003 for e in errs.values()):
+                break
+            target = {s: (t[0], t[1], t[2] - want - errs[s]) for s, t in target.items()}
         self.dual_gripper(GRIPPER_OPEN)
         for s in SIDES:
             self.weld(s, "detach")
             self.detach(s, names[s])
-        self.dual_straight({s: (p[0], p[1], p[2] + PRE_GRASP) for s, p in place.items()},
+        self.dual_straight({s: (t[0], t[1], t[2] + PRE_GRASP) for s, t in target.items()},
                            quats, 0.3)
         time.sleep(1.0)
         now = self.gz_model_positions()

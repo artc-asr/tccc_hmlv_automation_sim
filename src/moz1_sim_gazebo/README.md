@@ -225,7 +225,13 @@ What it took, for anyone extending it:
   it to ~48 N·m. Even so, the loaded torso's position loop wobbles a few degrees while
   the base moves, so the drive stops at 2.5° of sag, lets it settle (≈0.5 s), and
   continues — you'll see `torso sagged …: stopped, it settled back` lines (~20-50 per
-  drive). Placing on the deck crouches (`deep`/`low_lean`, ~77-79 N·m at the hip).
+  drive). Placing on the deck crouches (`low_lean`, ~79 N·m at the hip). Not `deep`:
+  loaded, the arms couldn't hold the path in that crouch and drove the held cans
+  through the deck before the controller aborted.
+- **Guarded placement.** The descent stops 3 cm above the surface, measures where
+  each can's bottom really is in Gazebo and corrects the rest (logged as
+  `placing on the …: can bottoms left … mm, right … mm`), so a sagging arm can't
+  push a held can into the belt or the deck.
 - **Drives are acceleration-limited** (gz's base plugin applies commanded velocity
   instantly) and stop within 1 cm / 0.5° — a residual is fine, everything after uses
   the measured base pose and Gazebo's can poses.
