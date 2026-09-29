@@ -13,12 +13,17 @@ Args:
   lidar      true/false — enable the gpu_lidar. Needs a working GPU render
              engine; set false on machines whose GPU can't drive ogre2 (the
              lidar would otherwise stall the sim). Control/base/arm still work.
+  grasp_targets
+             comma list of side:model pairs the grippers can weld, e.g.
+             "left:bearing_ring,right:sample_bottle" (default, the pickplace
+             world). Each pair gets its own grasp plugin + bridged topics.
 """
 import os
 import subprocess
 import xml.etree.ElementTree as ET
 
-from ament_index_python.packages import get_package_prefix, get_package_share_directory
+from ament_index_python.packages import (PackageNotFoundError, get_package_prefix,
+                                         get_package_share_directory)
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, ExecuteProcess, OpaqueFunction,
                             RegisterEventHandler, TimerAction)
@@ -37,23 +42,74 @@ def _inject_default_inertials(urdf_text):
     inertials. Links that ALREADY have an inertial (e.g. the 40 kg chassis and the
     parametrized base/leg/waist links) are left untouched. Pure frame links
     (base_link, world, neck) have no geometry and are skipped — Gazebo lumps them.
+
+    Exception: a geometry-less link that is the CHILD OF A MOVABLE JOINT can't be
+    lumped, so urdf2sdf drops it and the joint with it. That is exactly the
+    gripper's `*_gripper_actuator_link` under the prismatic `*_gripper_joint`,
+    and losing it is why the gripper controllers never activated. Those links get
+    a tiny inertial so the joint survives.
     Inertials are physics-only; RViz/MoveIt/the real robot ignore them."""
     root = ET.fromstring(urdf_text)
+    movable_children = {j.find("child").get("link") for j in root.findall("joint")
+                        if j.get("type") != "fixed"}
     added = []
     for link in root.findall("link"):
         if link.find("inertial") is not None:
             continue
-        if link.find("visual") is None and link.find("collision") is None:
+        has_geometry = link.find("visual") is not None or link.find("collision") is not None
+        if has_geometry:
+            mass, inertia = "0.3", "0.001"
+        elif link.get("name") in movable_children:
+            mass, inertia = "0.01", "1e-6"
+        else:
             continue
         inertial = ET.SubElement(link, "inertial")
         ET.SubElement(inertial, "origin", {"xyz": "0 0 0", "rpy": "0 0 0"})
-        ET.SubElement(inertial, "mass", {"value": "0.3"})
-        ET.SubElement(inertial, "inertia", {"ixx": "0.001", "ixy": "0", "ixz": "0",
-                                            "iyy": "0.001", "iyz": "0", "izz": "0.001"})
+        ET.SubElement(inertial, "mass", {"value": mass})
+        ET.SubElement(inertial, "inertia", {"ixx": inertia, "ixy": "0", "ixz": "0",
+                                            "iyy": inertia, "iyz": "0", "izz": inertia})
         added.append(link.get("name"))
     if added:
         print(f"[sim_gazebo] injected default inertials into {len(added)} link(s): "
               f"{', '.join(added)}")
+    return ET.tostring(root, encoding="unicode")
+
+
+def _parse_grasp_targets(text):
+    """'left:a,left:b,right:c' -> [('left','a'), ('left','b'), ('right','c')]."""
+    pairs = []
+    for item in filter(None, (t.strip() for t in text.split(","))):
+        side, _, model = item.partition(":")
+        if side not in ("left", "right") or not model:
+            raise ValueError(f"grasp_targets: bad entry '{item}' (want left:<model> "
+                             f"or right:<model>)")
+        pairs.append((side, model))
+    return pairs
+
+
+def _inject_grasp_welds(urdf_text, pairs):
+    """One grasp plugin per (side, model), holding the model rigidly at
+    <side>_gripper_base_link from /grasp/<side>/<model>/attach until .../detach.
+    Each pair needs its own topics: every plugin listening on a shared topic
+    would grab its model at once, wherever it is in the world.
+
+    The plugin is moz1_sim_gazebo's KinematicGrasp (src/kinematic_grasp.cc), not
+    gz's DetachableJoint: Fortress's dartsim solves a DetachableJoint between two
+    models as a soft constraint that let a 4 kg jerry can swing 20 cm in the hand
+    — or fling the arm — from run to run. KinematicGrasp takes the same
+    parameters and topics, carries the object rigidly and puts its weight on the
+    hand."""
+    root = ET.fromstring(urdf_text)
+    for side, model in pairs:
+        gz = ET.SubElement(root, "gazebo")
+        plugin = ET.SubElement(gz, "plugin", {
+            "filename": "moz1_kinematic_grasp",
+            "name": "moz1_sim_gazebo::KinematicGrasp"})
+        for tag, text in (("parent_link", f"{side}_gripper_base_link"),
+                          ("child_model", model),
+                          ("attach_topic", f"/grasp/{side}/{model}/attach"),
+                          ("detach_topic", f"/grasp/{side}/{model}/detach")):
+            ET.SubElement(plugin, tag).text = text
     return ET.tostring(root, encoding="unicode")
 
 
@@ -65,6 +121,7 @@ def launch_setup(context, *args, **kwargs):
     gui = LaunchConfiguration("gui").perform(context)      # 'true' / 'false'
     fix_base = LaunchConfiguration("fix_base").perform(context)  # 'true' / 'false'
     spawn_delay = float(LaunchConfiguration("spawn_delay").perform(context))
+    grasp_pairs = _parse_grasp_targets(LaunchConfiguration("grasp_targets").perform(context))
 
     # Run the xacro CLI (not xacro.process_file, whose mappings don't reliably
     # override an <xacro:arg> here). lidar:= toggles the sensor; sim_collision:=true
@@ -75,15 +132,23 @@ def launch_setup(context, *args, **kwargs):
     # Guarantee every geometry link has an inertial (moz1_description syncs keep
     # reverting the arm/gripper inertials → Gazebo drops the arms otherwise).
     robot_desc = _inject_default_inertials(robot_desc)
+    robot_desc = _inject_grasp_welds(robot_desc, grasp_pairs)
 
     # gz needs its own search paths (it doesn't read ROS's package:// or ament):
     #  * plugin lib dir so it finds libign_ros2_control-system.so
     #  * resource path (the share PARENT) so model://moz1_description/... resolves
-    ros_lib = os.path.join(get_package_prefix("ign_ros2_control"), "lib")
+    # gz_ros2_control (Humble) also ships libign_ros2_control-system.so and the
+    # ign_ros2_control/IgnitionSystem alias, so fall back to it when the separate
+    # ros-humble-ign-ros2-control package isn't installed.
+    try:
+        ros_lib = os.path.join(get_package_prefix("ign_ros2_control"), "lib")
+    except PackageNotFoundError:
+        ros_lib = os.path.join(get_package_prefix("gz_ros2_control"), "lib")
     desc_parent = os.path.dirname(get_package_share_directory("moz1_description"))
+    own_lib = os.path.join(get_package_prefix("moz1_sim_gazebo"), "lib")  # KinematicGrasp
     gz_env = {
-        "IGN_GAZEBO_SYSTEM_PLUGIN_PATH":
-            ros_lib + os.pathsep + os.environ.get("IGN_GAZEBO_SYSTEM_PLUGIN_PATH", ""),
+        "IGN_GAZEBO_SYSTEM_PLUGIN_PATH": os.pathsep.join(
+            [ros_lib, own_lib, os.environ.get("IGN_GAZEBO_SYSTEM_PLUGIN_PATH", "")]),
         "IGN_GAZEBO_RESOURCE_PATH":
             desc_parent + os.pathsep + os.environ.get("IGN_GAZEBO_RESOURCE_PATH", ""),
 
@@ -103,13 +168,18 @@ def launch_setup(context, *args, **kwargs):
                output="screen",
                parameters=[{"use_sim_time": True, "robot_description": robot_desc}])
 
+    # Free base: z = wheel radius (~0.105 m) + margin, so the base rests ON the
+    # ground, not jammed INTO it. Spawning at 0.05 buried the wheels + 40 kg
+    # chassis box ~5 cm underground → DART fought a huge static contact force
+    # every step → sim ran ~1 step / 10 s and the controllers couldn't activate.
+    # Fixed base: the URDF already lifts base_link 0.10 above its `world` link and
+    # the wheels are r=0.105, so spawning at 0 sinks them 5 mm into the ground —
+    # the same step-rate collapse. 0.01 leaves 5 mm clearance and puts base_link at
+    # z=0.11 in the gz world (the jerry-can scene is laid out against that). The
+    # old 0.12 left the pinned robot hovering 12 cm up.
+    spawn_z = "0.01" if fix_base.lower() in ("true", "1", "yes") else "0.12"
     spawn = Node(package="ros_gz_sim", executable="create", output="screen",
-                 # z = wheel radius (~0.105 m) + margin, so the base rests ON the
-                 # ground, not jammed INTO it. Spawning at 0.05 buried the wheels +
-                 # 40 kg chassis box ~5 cm underground → DART fought a huge static
-                 # contact force every step → sim ran ~1 step / 10 s and the
-                 # controllers couldn't activate (only shows with the free base).
-                 arguments=["-topic", "robot_description", "-name", "moz1", "-z", "0.12"])
+                 arguments=["-topic", "robot_description", "-name", "moz1", "-z", spawn_z])
 
     # gz <-> ROS bridge. '[' = gz->ROS, ']' = ROS->gz, '@' = bidirectional.
     bridge = Node(package="ros_gz_bridge", executable="parameter_bridge", output="screen",
@@ -133,12 +203,12 @@ def launch_setup(context, *args, **kwargs):
                       "/cam_right_wrist/image@sensor_msgs/msg/Image[ignition.msgs.Image",
                       "/cam_right_wrist/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
                       "/cam_right_wrist/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-                      # grasp weld: ROS Empty -> gz DetachableJoint attach/detach
-                      # (see the robot xacro + scripts/grasp_helper.py).
-                      "/grasp/left/attach@std_msgs/msg/Empty]ignition.msgs.Empty",
-                      "/grasp/left/detach@std_msgs/msg/Empty]ignition.msgs.Empty",
-                      "/grasp/right/attach@std_msgs/msg/Empty]ignition.msgs.Empty",
-                      "/grasp/right/detach@std_msgs/msg/Empty]ignition.msgs.Empty",
+                  ] + [
+                      # grasp: ROS Empty -> gz KinematicGrasp attach/detach,
+                      # one pair per grasp target (see _inject_grasp_welds and
+                      # scripts/grasp_helper.py).
+                      f"/grasp/{side}/{model}/{act}@std_msgs/msg/Empty]ignition.msgs.Empty"
+                      for side, model in grasp_pairs for act in ("attach", "detach")
                   ],
                   remappings=[("/livox/lidar/points", "/livox/lidar")],
                   parameters=[{"use_sim_time": True}])
@@ -147,7 +217,12 @@ def launch_setup(context, *args, **kwargs):
     # on open (so the manipulation skill stays sim/real-agnostic). See the module.
     grasp_helper = Node(package="moz1_sim_gazebo", executable="grasp_helper.py",
                         name="grasp_helper", output="screen",
-                        parameters=[{"use_sim_time": True}])
+                        parameters=[{"use_sim_time": True,
+                                     # [""] keeps the param typed as a string array
+                                     "left_targets": [m for sd, m in grasp_pairs
+                                                      if sd == "left"] or [""],
+                                     "right_targets": [m for sd, m in grasp_pairs
+                                                       if sd == "right"] or [""]}])
 
     def spawner(name):
         return Node(package="controller_manager", executable="spawner",
@@ -187,6 +262,10 @@ def generate_launch_description():
         DeclareLaunchArgument("fix_base", default_value="false",
                               description="Pin base to `world` (upright, stable — for "
                                           "MoveIt); false = free holonomic base."),
+        DeclareLaunchArgument("grasp_targets",
+                              default_value="left:bearing_ring,right:sample_bottle",
+                              description="side:model pairs the grippers can weld "
+                                          "(comma separated)."),
         DeclareLaunchArgument("spawn_delay", default_value="8.0",
                               description="Seconds to wait after spawn before starting "
                                           "the controllers (raise on slow/CPU-only "

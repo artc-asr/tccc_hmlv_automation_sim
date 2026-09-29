@@ -123,9 +123,46 @@
     <xacro:pos_joint name="RightArm-5" init="0.1396263402"/>
     <xacro:pos_joint name="RightArm-6" init="0.1221730476"/>
 
-    <xacro:pos_joint name="left_gripper_joint"  init="0.03"/>
-    <xacro:pos_joint name="right_gripper_joint" init="0.03"/>
+    <!-- 0..0.12 = SDK stroke (0 closed, 0.12 open), see moz1_gripper_macros.xacro. -->
+    <xacro:pos_joint name="left_gripper_joint"  init="0.12"/>
+    <xacro:pos_joint name="right_gripper_joint" init="0.12"/>
+
+    <!-- Finger linkage: every revolute in the gripper <mimic>s *_gripper_joint in
+         the URDF, but gz has no mimic constraint, so without these the fingers
+         hang limp. gz_ros2_control drives each one to multiplier * actuator.
+         Multipliers are copied from moz1_gripper_macros.xacro; gz_ros2_control
+         (Humble) has no offset term, so the fingers sit a few degrees off the
+         URDF pose — visual only, the grasp itself is the KinematicGrasp hold. -->
+    <xacro:macro name="mimic_joint" params="name mimic multiplier">
+      <joint name="${name}">
+        <param name="mimic">${mimic}</param>
+        <param name="multiplier">${multiplier}</param>
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+    </xacro:macro>
+    <xacro:macro name="gripper_mimics" params="side">
+      <xacro:mimic_joint name="${side}_gripper_narrow1_joint"     mimic="${side}_gripper_joint" multiplier="-6.801257207"/>
+      <xacro:mimic_joint name="${side}_gripper_narrow3_joint"     mimic="${side}_gripper_joint" multiplier="1.662416185"/>
+      <xacro:mimic_joint name="${side}_gripper_narrow_loop_joint" mimic="${side}_gripper_joint" multiplier="-10.297862281"/>
+      <xacro:mimic_joint name="${side}_gripper_wide1_joint"       mimic="${side}_gripper_joint" multiplier="6.801257207"/>
+      <xacro:mimic_joint name="${side}_gripper_wide3_joint"       mimic="${side}_gripper_joint" multiplier="-1.662416185"/>
+      <xacro:mimic_joint name="${side}_gripper_wide_loop_joint"   mimic="${side}_gripper_joint" multiplier="10.297862281"/>
+    </xacro:macro>
+    <xacro:gripper_mimics side="left"/>
+    <xacro:gripper_mimics side="right"/>
   </ros2_control>
+
+  <!-- Keep *_gripper_base_link as its own gz link. It hangs off a FIXED mount
+       joint, so urdf2sdf would otherwise lump it into the wrist (left07/right07)
+       and the grasp plugin's parent_link would not exist. -->
+  <gazebo reference="left_gripper_mount_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
+  <gazebo reference="right_gripper_mount_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
 
   <!-- ign_ros2_control plugin: runs the controller_manager as a native ROS2 node. -->
   <gazebo>
@@ -136,29 +173,15 @@
   </gazebo>
 
   <!-- ============ Grasp emulation (sim-only) ==================================
-       A simple gripper can't lift an object by friction in gz, so we WELD the
-       object to the gripper with a gz DetachableJoint when grasped. Publish Empty
-       on the attach topic to fix child_model to the gripper at their current
-       relative pose; publish detach to drop it. The scripts/grasp_helper.py node
-       fires these off the gripper joint closing/opening, so the manipulation SKILL
-       stays sim/real-agnostic (it just closes the gripper, as on the real robot).
-       child_model names match moz1_pickplace.world. Fortress 6.18 supports the
-       backported <attach_topic>. -->
-  <xacro:macro name="grasp_weld" params="side object">
-    <gazebo>
-      <plugin filename="ignition-gazebo-detachable-joint-system"
-              name="ignition::gazebo::systems::DetachableJoint">
-        <parent_link>${side}_gripper_base_link</parent_link>
-        <child_model>${object}</child_model>
-        <child_link>link</child_link>
-        <attach_topic>/grasp/${side}/attach</attach_topic>
-        <detach_topic>/grasp/${side}/detach</detach_topic>
-        <suppress_child_warning>true</suppress_child_warning>
-      </plugin>
-    </gazebo>
-  </xacro:macro>
-  <xacro:grasp_weld side="left"  object="bearing_ring"/>
-  <xacro:grasp_weld side="right" object="sample_bottle"/>
+       A simple gripper can't lift an object by friction in gz, so the object is
+       held rigidly at *_gripper_base_link by moz1_sim_gazebo's KinematicGrasp
+       system (src/kinematic_grasp.cc) when grasped. The plugins are NOT declared
+       here: sim_gazebo.launch.py injects one per (side, object) from its
+       `grasp_targets` argument, each on its own topic pair
+       /grasp/<side>/<object>/{attach,detach}. (A shared attach topic would grab
+       EVERY target in the world at once.) scripts/grasp_helper.py fires them off
+       the gripper closing/opening. The mount joint is preserved (below) so
+       *_gripper_base_link exists in gz. -->
 
   <!-- ============ Holonomic base + ground-truth odometry (gz-sim systems) =======
        VelocityControl applies the /cmd_vel twist (vx, vy, wz) directly to the

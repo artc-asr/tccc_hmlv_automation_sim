@@ -82,6 +82,103 @@ ros2 action send_goal /left_gripper_controller/follow_joint_trajectory \
      points: [{positions: [0.0], time_from_start: {sec: 2}}]}}"
 ```
 
+### Jerry-can depalletising demo
+
+The Moz1 unloads the top-front row of a pallet of HDPE jerry cans onto the two infeed
+conveyors of a liquid-filling line — the cell from the humanoid pallet-reach check,
+with the container data (TCCC dimensions, UN marking, empty weights) taken from it.
+
+```bash
+source source_sim.sh gpu
+pkill -9 -f 'ign gazebo'
+ros2 launch moz1_sim_gazebo sim_gazebo_jerrycan.launch.py                  # 4 L, both arms
+ros2 launch moz1_sim_gazebo sim_gazebo_jerrycan.launch.py container:=10 arms:=left
+ros2 launch moz1_sim_gazebo sim_gazebo_jerrycan.launch.py demo:=false      # scene only
+ros2 launch moz1_sim_gazebo sim_gazebo_jerrycan.launch.py gui:=true        # + Gazebo's window
+```
+
+**RViz is the view; Gazebo runs headless** (as in artc_ranger_xarm6 — the gz window
+renders black on some GPUs). RViz shows the robot, the cell and MoveIt's planned
+path. The cell is mirrored from the world SDF by `scripts/scene_markers.py`; the
+jerry cans follow the live sim through `gz_pose_tf` (`src/gz_pose_tf.cc`), which
+reads each can's pose from Gazebo's `dynamic_pose/info` over ign-transport and
+broadcasts it as a TF frame `gz_world → jerrycan_*` (ros_gz_bridge drops the model
+names from that message, and the only gz-transport Python bindings here are
+Harmonic's).
+
+The launch (1) runs `scripts/jerrycan_scene.py`, writing the world and a scene YAML to
+`/tmp/moz1_jerrycan_<size>L/`; (2) includes `sim_gazebo_moveit.launch.py` with that
+world, the base pinned and one grasp weld per pickable can (`grasp_targets`); (3) starts
+`scripts/jerrycan_demo.py`, which waits for the controllers and move_group, then per can:
+
+1. **locate** the can (Gazebo's pose stands in for perception; a can that's been
+   knocked > 3 cm out of place is skipped, not grasped blind);
+2. open to 0.08 (≈ 63 mm jaw), **OMPL** to 12 cm above the handle, jaw across the bar;
+3. **Cartesian** straight down, close to the bar width, grab (`/grasp/<side>/target`
+   then `/grasp/<side>/attach`), lift 5 cm and check the can came up;
+4. lift clear of the stack, **OMPL** to above a free conveyor slot (filled back to
+   front, so the arm never reaches over a placed can), keeping the grasp yaw;
+5. **Cartesian** down until the can is 3 mm above the belt; open, release, retreat;
+6. **verify** in Gazebo that the can stands on its slot.
+
+Between motions it waits for the arm to stop: the trajectory controller reports
+success when the trajectory's *time* is up, and a loaded arm is still catching up.
+
+It ends with `done: N/M jerry cans verified on the conveyors`. A MoveIt planning scene
+mirrors the cell (pallet, stack bodies + handles, full-height cans, conveyors); the
+held can is attached to the hand so transits avoid the stack.
+
+| arg | default | |
+|---|---|---|
+| `container` | `4` | jerry can size in litres: `4`, `10`, `20` |
+| `layers` | `0` | stack levels; 0 = 3 (4/10 L) or 2 (20 L) |
+| `density` | `1.0` | liquid density, g/mL — sets the can mass |
+| `physics_step` | `0.004` | gz step, s |
+| `demo` | `true` | run the pick-and-place |
+| `arms` | `both` | `both` \| `left` \| `right` (left takes the y > 0 cans) |
+| `count` | `0` | max cans, 0 = all |
+| `speed` | `0.4` | free-space velocity scaling |
+| `gui` | **`false`** | Gazebo's own window |
+| `rviz` | `true` | the RViz view above (`config/moz1_jerrycan.rviz`) |
+| `lidar` / `spawn_delay` | **`false`** / `8.0` | passed to the sim |
+
+`sim_gazebo_moveit.launch.py` gained `world`, `grasp_targets`, `rviz` and
+`allowed_start_tolerance` (default 0.01, MoveIt's own) pass-throughs for this.
+
+Regenerate the checked-in `worlds/moz1_jerrycan.world` (4 L, usable with the plain
+launches plus `grasp_targets:=left:jerrycan_left_1,...`) with
+`scripts/jerrycan_scene.py --out-dir worlds`.
+
+Design notes, each learnt the hard way:
+
+- **Stacked cans collide as a full-height envelope** (W × L × h). With body-only
+  collision the can above sat on the body top, 45 mm low with the handle sunk into it,
+  and every grasp went 45 mm off.
+- **Pick targets have body-only collision.** The jaw has to straddle the handle bar;
+  the grasp itself is the grasp plugin, so the handle is visual.
+- **The grasp is `KinematicGrasp`, not gz's DetachableJoint** (`src/kinematic_grasp.cc`,
+  same parameters and topics). Fortress's dartsim joins two models with a soft
+  `WeldJointConstraint`; with a 4.2 kg can it held to the millimetre in some runs and
+  let the can swing 20 cm, or flung the arm, in others. KinematicGrasp re-poses the
+  held can at its grasped offset every step and puts its weight on the gripper link
+  as a wrench, so the hold is rigid and the arm still carries the load.
+- **Loaded arms sag.** gz's position control leaves ~0.02 rad of error under a 4 kg
+  can, past MoveIt's default 0.01 rad start tolerance; the launch sets
+  `allowed_start_tolerance:=0.05` on move_group.
+- **Close edge isn't trusted.** The trajectory controller reports success when time
+  runs out, reached or not, so the demo requests the grab explicitly after closing
+  (grasp_helper's edge trigger stays as the sim/real-agnostic path).
+- **Controllers at 250 Hz** (`gazebo_controllers.yaml`), matching the 4 ms physics
+  step. At 100 Hz the loaded wrist fell into a limit cycle.
+- **Keep the yaw.** Both top-down yaws are valid grasps, but the transit to the slot
+  must end at the yaw the straight-line moves use, or the descent would need a
+  half-turn of the wrist.
+- **Payload is real.** The held can's weight loads the arm, against the URDF's
+  50 N·m arm effort limits (Moz1's real torques and payload are unpublished; 5 kg/arm
+  is the reach page's placeholder). 4 L (4.2 kg) runs 6/6. 10 L (10.55 kg) goes 0/4:
+  the arm sags 16 cm the moment it takes the load (~52 N·m at the shoulder). The
+  demo logs the over-rating and tries anyway; a dual-arm lift is the next step.
+
 ### Level 2 — Navigation (Nav2 + SLAM)
 
 Terminal 1 — sim + Nav2 + SLAM + RViz (**GUI stays ON — required for the lidar**, see note):
@@ -147,6 +244,7 @@ and a leftover one hijacks `/clock` (controllers then can't activate).
 | `gui` | `true` | gz 3D GUI. `false` = headless — **but the lidar won't render headless on a PRIME laptop**, so keep it ON for nav (fine to disable for arms-only/manipulation) |
 | `fix_base` | `false` (but the MoveIt launch defaults it **true**) | pin `base_link` to a `world` link — keeps the robot **upright/stable** and publishes the **`world`** frame the MoveIt SRDF `virtual_joint` needs. `false` = free holonomic base (VelocityControl + `/odom`) |
 | `spawn_delay` | `8.0` | seconds after spawn before starting controllers, so the sim is stepping first; raise on slow machines |
+| `grasp_targets` | `left:bearing_ring,right:sample_bottle` | `side:model` pairs the grippers can grab; one KinematicGrasp plugin + `/grasp/<side>/<model>/{attach,detach}` bridge per pair. `grasp_helper` grabs the pair selected on `/grasp/<side>/target` (default: the side's first) when the gripper closes |
 | `sim_collision` | (set true by the launch) | swap STL collision meshes for fast AABB boxes — see [Design notes](#design-notes) |
 
 ## GPU rendering (hybrid Intel + NVIDIA laptop)
@@ -265,6 +363,10 @@ ros2 topic echo /livox/lidar --once | grep frame_id   # => livox_frame (not moz1
 | `/livox/lidar` silent but sim renders & `/cmd_vel` works | bridge read the wrong gz topic — the cloud is on gz `/livox/lidar/**points**`. Fixed in `sim_gazebo.launch.py` (bridge `/livox/lidar/points` → remap `/livox/lidar`) |
 | lidar `frame_id: moz1/base_link/livox_lidar` (SLAM/Nav2 can't transform the cloud) | urdf2sdf lumped `livox_frame` into `base_link`; `<ignition_frame_id>livox_frame</ignition_frame_id>` on the sensor restores it. If your Fortress build ignores that tag, override the frame in the bridge instead |
 | `Frame [world] does not exist` / `Requesting initial scene failed` / robot spawns **tilted** | the MoveIt SRDF wants a `world` frame, and the free base tips under the (placeholder-mass) arms — run with `fix_base:=true` (the MoveIt launch does by default): it pins the base upright and publishes `world` |
+| `/clock` silent, grasp topics dead, but `ign topic -l` shows everything | the ROS bridge is the Harmonic one (`ros-humble-ros-gzharmonic`, gz-transport13) — it can't talk to Fortress. Build ros_gz for Fortress (top-level README, *Install*); `source_sim.sh` overlays it |
+| `fix_base:=true` sim crawls (~1 step / 10 s), controllers time out | wheels buried in the ground. The fixed base spawns at z = 0.01 (base_link 0.11, wheels r = 0.105); don't lower it |
+| gripper controllers won't activate: `Not existing: [ left_gripper_joint/position ]` | the gripper's actuator link was dropped by urdf2sdf — fixed by `_inject_default_inertials` (movable-joint children get an inertial). If it's back, check that function still runs |
+| two demos fighting: arm goals `CONTROL_FAILED`, grasp targets switching by themselves | a demo/launch from an earlier run is still alive. The gz server *and* Python nodes survive Ctrl-C — `pkill -9 -f 'ign gazebo'; pkill -f jerrycan_demo; pkill -f move_group` |
 | RViz: `Could not … robot_description_semantic` / can't parse SRDF | the RViz node needs the SRDF — `sim_gazebo_moveit.launch.py` now passes `robot_description` + `robot_description_semantic` to it |
 | MoveIt: `The complete state of the robot is not yet known. Missing Base-0..3` | the wheel joints weren't in `ros2_control`; they're now added **state-only** so `/joint_states` is complete |
 

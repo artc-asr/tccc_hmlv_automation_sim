@@ -6,7 +6,10 @@
 # (Copied from moz1_moveit_config/config/ros2_controllers.yaml — keep in sync.)
 controller_manager:
   ros__parameters:
-    update_rate: 100  # Hz
+    # = the 4 ms physics step. At 100 Hz the (velocity-driven) position loop acted on
+    # every 2.5th step and a wrist carrying a 4 kg jerry can settled into a limit
+    # cycle ("start point deviates" on the next MoveIt trajectory).
+    update_rate: 250  # Hz
     use_sim_time: true
 
     joint_state_broadcaster:

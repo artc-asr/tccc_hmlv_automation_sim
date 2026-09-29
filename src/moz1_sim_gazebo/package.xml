@@ -18,6 +18,10 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <!-- Gazebo Fortress + ros_gz -->
+  <depend>ignition-gazebo6</depend>
+  <depend>rclcpp</depend>
+  <depend>tf2_ros</depend>
+  <depend>geometry_msgs</depend>
   <exec_depend>ros_gz_sim</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>ign_ros2_control</exec_depend>
@@ -32,6 +36,11 @@
   <exec_depend>moz1_description</exec_depend>
   <exec_depend>moz1_navigation_bringup</exec_depend>
   <exec_depend>moz1_moveit_config</exec_depend>
+  <exec_depend>moveit_msgs</exec_depend>
+  <exec_depend>control_msgs</exec_depend>
+  <exec_depend>controller_manager_msgs</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

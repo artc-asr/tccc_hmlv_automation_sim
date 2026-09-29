@@ -78,6 +78,24 @@ sudo apt install -y \
 For the Isaac backend, also `ros-humble-topic-based-ros2-control` — see
 [`docs/ISAAC.md`](docs/ISAAC.md).
 
+> **Got `ros-humble-ros-gzharmonic` instead?** It conflicts with `ros-humble-ros-gz`,
+> and its bridge speaks gz-transport13, which never sees Fortress topics (`/clock`,
+> the grasp topics … all silent). Build `ros_gz` (branch `humble`) for Fortress in a
+> sibling workspace — `source_sim.sh` overlays `../gz_fortress_ws` automatically
+> (override with `MOZ1_GZ_WS`):
+>
+> ```bash
+> mkdir -p ../gz_fortress_ws/src && cd ../gz_fortress_ws/src
+> git clone -b humble https://github.com/gazebosim/ros_gz.git
+> git clone -b ros2-devel https://github.com/swri-robotics/gps_umd.git   # gps_msgs
+> cd .. && source /opt/ros/humble/setup.bash && export GZ_VERSION=fortress
+> colcon build --packages-select gps_msgs ros_gz_interfaces ros_gz_bridge ros_gz_sim \
+>   --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+> ```
+>
+> `ros-humble-gz-ros2-control` is enough for the controllers: it ships the
+> `ign_ros2_control` plugin names too, and the launch falls back to it.
+
 ## Build & run
 
 ```bash
@@ -111,6 +129,10 @@ ros2 launch moz1_sim_gazebo sim_gazebo_nav.launch.py
 
 # BOTH in one sim: free base + Nav2/SLAM + move_group (the full pick-and-place loop)
 ros2 launch moz1_sim_gazebo sim_gazebo_full.launch.py
+
+# jerry-can depalletising demo: pallet of 4 L cans → both arms → infeed conveyors
+# (Gazebo headless, RViz shows everything; add gui:=true for the gz window)
+ros2 launch moz1_sim_gazebo sim_gazebo_jerrycan.launch.py
 ```
 
 For the nav launches, also run the costmap relay in a second terminal — the shared
@@ -151,7 +173,7 @@ everything on `use_sim_time:=true`.
 | PUB | `/cam_high/image`, `/cam_{left,right}_wrist/image` (+ `depth_image`, `camera_info`) | `sensor_msgs/Image`, `CameraInfo` | gz camera sensors → bridge |
 | SUB | `/cmd_vel` (vx, vy, wz — holonomic) | `geometry_msgs/Twist` | bridge → gz `VelocityControl` |
 | both | `FollowJointTrajectory` on `left_arm`, `right_arm`, `torso`, `left_gripper`, `right_gripper` | `control_msgs/action` | `ign_ros2_control` (native ROS 2, no bridge) |
-| SUB | `/grasp/{left,right}/{attach,detach}` | `std_msgs/Empty` | sim-only grasp weld (`scripts/grasp_helper.py`) |
+| SUB | `/grasp/{left,right}/{attach,detach}`, `/grasp/{left,right}/target` | `std_msgs/Empty`, `std_msgs/String` | sim-only grasp weld (`scripts/grasp_helper.py`): welds the selected target on gripper close |
 
 MoveIt planning groups (from `moz1.srdf`): `left_arm` (7 DoF), `right_arm` (7 DoF),
 `dual_arm`, `torso` (6 DoF), `left_gripper`, `right_gripper`, with `home` / `zero` /
@@ -180,6 +202,30 @@ no external model URIs, nothing to download:
 the `*_filler_*` bodies are distractors. `moz1_lab.world` is the bare alternative —
 ground plane only — for pure locomotion or controller work.
 
+### Jerry-can depalletising cell
+
+`sim_gazebo_jerrycan.launch.py` generates a second scene (`scripts/jerrycan_scene.py`):
+the HMLV liquid-filling-line cell from the humanoid pallet-reach check — a EUR pallet
+(1200 × 1000 × 150 mm, worked from the 1200 side, 50 mm from the base) stacked with
+TCCC HDPE jerry cans, and an infeed conveyor (belt at 0.75 m) on each side of the
+robot. The base is pinned; `scripts/jerrycan_demo.py` then moves the top-front row
+onto the conveyors, alternating arms, through move_group (OMPL transit + Cartesian
+approach/lift/place):
+
+| `container:=` | can (W × L × h) | filled @ 1.0 g/mL | stack | targets | vs. 5 kg/arm placeholder | single-arm result in the sim |
+|---|---|---|---|---|---|---|
+| `4` (default) | 120 × 180 × 240 mm | 4.20 kg | 3 layers × 8 rows × 6 | 6 | within | **6/6** placed, 0–10 mm off the slot (two consecutive runs) |
+| `10` | 220 × 270 × 240 mm | 10.55 kg | 3 × 4 × 4 | 4 | **over** | 0/4 — the arm sags 16 cm on grasping: ~52 N·m needed at the shoulder vs. the URDF's 50 N·m limit |
+| `20` | 215 × 270 × 420 mm | 21.05 kg | 2 × 4 × 4 | 4 | **over** | not run; twice the 10 L load |
+
+Every place is checked against Gazebo's own model poses, so the final
+`done: N/M jerry cans verified on the conveyors` counts cans that are really standing
+on a slot. The held can's weight acts on the arm, so payload limits show up: 10 L
+fails single-armed exactly as the reach check predicts (it needs both arms, which
+the demo doesn't do yet). The Moz1's real per-arm payload and joint torques are
+unpublished — the URDF's 50 N·m arm effort limit is what the sim enforces.
+Arguments and design notes: [`src/moz1_sim_gazebo/README.md`](src/moz1_sim_gazebo/README.md#jerry-can-depalletising-demo).
+
 Running Gazebo headless? `scripts/scene_markers.py` (started automatically by the
 nav launches) republishes the world's fixtures as RViz markers on `/scene_markers`,
 so you can work entirely in RViz.
@@ -198,32 +244,28 @@ confirmed against `/odom`); MoveIt `move_group` comes up on the Gazebo robot and
 `error_code: SUCCESS`, joints land inside tolerance); all 22 launch files introspect
 cleanly.
 
-**Not working — the grippers do not activate.** `left_gripper_controller` and
-`right_gripper_controller` load and configure but fail to activate:
+**Grippers — fixed.** Upstream, `left_gripper_controller` / `right_gripper_controller`
+never activated (`Not existing: [ left_gripper_joint/position ]`): the prismatic
+`*_gripper_joint`'s child `*_gripper_actuator_link` is a pure frame, so urdf2sdf dropped
+the link and the joint, and the lumped-away `*_gripper_base_link` broke the grasp
+weld (`DetachableJoint: Link with name [left_gripper_base_link] not found`). Now:
 
-```
-resource_manager: Not acceptable command interfaces combination:
-  Not existing: [ left_gripper_joint/position ]
-gz_ros2_control: Skipping joint in the URDF named 'left_gripper_joint'
-                 which is not in the gazebo model.
-urdf2sdf: parent joint[left_gripper_joint] ignored.
-```
+- `_inject_default_inertials` also gives a tiny inertial to geometry-less links under
+  a **movable** joint, so the gripper joint survives;
+- `moz1_gazebo.urdf.xacro` preserves the gripper mount joint (`preserveFixedJoint`), so
+  `*_gripper_base_link` exists in gz, and drives the 6 finger joints per hand as
+  `gz_ros2_control` mimic joints (no offset term in Humble: fingers sit a few degrees
+  off the URDF pose — visual only);
+- the grasp plugins are generated per `(side, object)` from the `grasp_targets`
+  launch argument, each on its own topic pair. They are `KinematicGrasp`
+  (`src/kinematic_grasp.cc`), a rigid drop-in for gz's DetachableJoint, whose
+  soft two-model weld let heavy objects swing in the hand.
 
-Root cause: `{left,right}_gripper_joint`'s child link (`*_gripper_actuator_link`) is a
-pure frame — no visual, no collision, no inertial. `sim_gazebo.launch.py`'s
-`_inject_default_inertials` only injects into links that *have* geometry, so this one
-stays inertial-less; `urdf2sdf` then drops the link **and the prismatic joint above
-it**, and `gz_ros2_control` has no command interface to claim. The same lumping breaks
-the sim-only grasp weld (`DetachableJoint: Link with name [left_gripper_base_link] not
-found in model [moz1]`).
+All six controllers activate; closing a gripper welds its selected object.
 
-This is **pre-existing upstream**, not an artifact of this extraction —
-`sim_gazebo.launch.py`, `moz1_gazebo.urdf.xacro` and all of `moz1_description` are
-byte-identical to the internal repo. Arm planning and execution, navigation and the
-scene are unaffected; only closing a gripper on an object in Gazebo is. The likely fix
-is to widen `_inject_default_inertials` to cover geometry-less links that are the child
-of a non-fixed joint, and to point the `DetachableJoint` `parent_link` at the
-post-lumping link name.
+**Fixed base spawns at z = 0.01** (was 0.12, i.e. hovering): base_link lands at 0.11
+with the r = 0.105 m wheels 5 mm clear. Spawning at 0 sinks them 5 mm into the ground
+and the sim drops to ~1 step / 10 s — the same collapse the free base had at z = 0.05.
 
 ---
 

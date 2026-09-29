@@ -69,6 +69,21 @@ else
     echo "   ⚠️  ${_WS}/install/setup.bash not found — run: source source_sim.sh build"
 fi
 
+# -- optional source-built ros_gz for Fortress --------------------------------
+# Only needed when apt's ros-humble-ros-gz (Fortress) can't be installed — e.g.
+# ros-humble-ros-gzharmonic is installed instead and conflicts with it. Harmonic's
+# bridge speaks gz-transport13 and never sees Fortress (ign-transport11) topics,
+# so /clock, /odom and the grasp topics go silent. Build ros_gz (humble branch)
+# with GZ_VERSION=fortress into this overlay; MOZ1_GZ_WS overrides the location.
+# Sourced AFTER the workspace, and only its local_setup: the workspace setup.bash
+# re-sources /opt/ros/humble, which would put the Harmonic ros_gz back in front.
+_GZ_WS="${MOZ1_GZ_WS:-${_WS}/../gz_fortress_ws}"
+if [[ -f "${_GZ_WS}/install/setup.bash" ]]; then
+    source "${_GZ_WS}/install/local_setup.bash"
+    echo "   ✅ ros_gz (Fortress) overlay: $(cd "${_GZ_WS}" && pwd)"
+fi
+unset _GZ_WS
+
 # -- optional NVIDIA offload (hybrid-laptop specific, opt-in) -----------------
 if [[ -n "${_DO_GPU}" ]]; then
     if [[ -f "${_WS}/gpu_nvidia.sh" ]]; then
