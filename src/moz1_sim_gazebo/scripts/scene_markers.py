@@ -146,6 +146,9 @@ class SceneMarkers(Node):
                     if m is None:
                         continue
                     m.header.frame_id = name if live else self.frame_id
+                    # re-transform every frame: otherwise RViz places a marker only
+                    # when the array arrives (every 2 s) and moving cans jump
+                    m.frame_locked = live
                     m.ns = name
                     m.id = mid
                     arr.markers.append(m)

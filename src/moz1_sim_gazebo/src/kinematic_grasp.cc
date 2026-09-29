@@ -81,6 +81,7 @@ public:
       ignmsg << "KinematicGrasp: released [" << this->childModelName << "]\n";
     }
     if (this->attachRequest.exchange(false) && !this->attached) {
+      this->ReadMass(_ecm);
       this->relPose = worldPose(this->parentLink.Entity(), _ecm).Inverse() *
                       worldPose(this->childModel.Entity(), _ecm);
       this->attached = true;
@@ -122,13 +123,19 @@ private:
       }
       this->childModel = Model(e);
       this->childLink = Link(this->childModel.CanonicalLink(_ecm));
-      const auto *inertial = _ecm.Component<components::Inertial>(this->childLink.Entity());
-      if (inertial != nullptr) {
-        this->mass = inertial->Data().MassMatrix().Mass();
-        this->comOffset = inertial->Data().Pose().Pos();
-      }
     }
     return true;
+  }
+
+  // Read at every attach, not once: the object's mass can change during the run
+  // (e.g. ConveyorBelt fills an empty container).
+  void ReadMass(EntityComponentManager &_ecm)
+  {
+    const auto *inertial = _ecm.Component<components::Inertial>(this->childLink.Entity());
+    if (inertial != nullptr) {
+      this->mass = inertial->Data().MassMatrix().Mass();
+      this->comOffset = inertial->Data().Pose().Pos();
+    }
   }
 
   void OnAttach(const msgs::Empty &) { this->attachRequest = true; }

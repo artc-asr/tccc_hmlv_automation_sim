@@ -179,6 +179,57 @@ Design notes, each learnt the hard way:
   the arm sags 16 cm the moment it takes the load (~52 N·m at the shoulder). The
   demo logs the over-rating and tries anyway; a dual-arm lift is the next step.
 
+### Jerry-can transfer demo (both arms, mobile base, filling line)
+
+One pair of 4 L cans through a filling line, both arms at once, the base driving
+between stations:
+
+```bash
+ros2 launch moz1_sim_gazebo sim_gazebo_transfer.launch.py
+ros2 launch moz1_sim_gazebo sim_gazebo_transfer.launch.py demo:=false   # the cell only
+```
+
+| station (robot base y) | what happens |
+|---|---|
+| **pallet A** (0.0) | both arms pick two **empty** cans (0.2 kg) at once: top layer, first remaining row (nothing in front), innermost pair; torso leaned over the pallet as needed (`lean45` for row 3) — base stays in front |
+| **conveyor load** (1.3) | both cans set on the belt side by side |
+| conveyor | carries them 2.2 m to the filling station; each becomes **4.2 kg** (`ConveyorBelt` plugin) |
+| **conveyor unload** (3.5) | both arms pick the **filled** pair |
+| **pallet B** (5.3) | torso crouches, both cans placed on the deck (bottom level), nearest row |
+
+Ends with `done: both filled jerry cans verified on pallet B`, both positions checked
+in Gazebo. `cleared_rows` (default 2) sets how many top-layer rows of pallet A are
+already gone, so the pick needs the torso lean (verified with the default 2).
+
+How it's built: `scripts/transfer_scene.py` (cell), `scripts/transfer_demo.py`
+(sequence; extends `jerrycan_demo.py`), `src/conveyor_belt.cc` (belt + filling).
+The base is free (`fix_base:=false`) and driven on `/cmd_vel` against `/odom`; the
+MoveIt scene is re-expressed in `base_link` after every drive.
+
+What it took, for anyone extending it:
+
+- **Picks come out of a packed row by sliding back**, not lifting high: lift 8 cm
+  (clear of the layer below), then straight back toward the robot. The neighbours
+  are 4 mm away on either side; a high lift over them put the hands at the edge of
+  their reach, and a free-space path out clipped them.
+- **Two arms moving together are collision-checked together.** Each arm's straight
+  line is planned alone; if that fails only because the other arm was held still
+  (a can rising past the other, still-low wrist camera), the synchronized motion is
+  re-checked state by state with `/check_state_validity`.
+- **IK is chosen for the whole straight corridor** (random seeds until one
+  configuration covers down-to-the-handle and up-to-the-lift): KDL's first answer can
+  run an elbow into a joint limit halfway up.
+- **Carrying the filled pair (8.4 kg) needs posture.** With the torso upright and
+  the hands 0.53 m out, the hip joint needs ~81 of its 100 N·m (URDF placeholder) and
+  the torso folded mid-drive. The `carry` torso pose (hips back, chest upright) brings
+  it to ~48 N·m. Even so, the loaded torso's position loop wobbles a few degrees while
+  the base moves, so the drive stops at 2.5° of sag, lets it settle (≈0.5 s), and
+  continues — you'll see `torso sagged …: stopped, it settled back` lines (~20-50 per
+  drive). Placing on the deck crouches (`deep`/`low_lean`, ~77-79 N·m at the hip).
+- **Drives are acceleration-limited** (gz's base plugin applies commanded velocity
+  instantly) and stop within 1 cm / 0.5° — a residual is fine, everything after uses
+  the measured base pose and Gazebo's can poses.
+
 ### Level 2 — Navigation (Nav2 + SLAM)
 
 Terminal 1 — sim + Nav2 + SLAM + RViz (**GUI stays ON — required for the lidar**, see note):
@@ -366,7 +417,8 @@ ros2 topic echo /livox/lidar --once | grep frame_id   # => livox_frame (not moz1
 | `/clock` silent, grasp topics dead, but `ign topic -l` shows everything | the ROS bridge is the Harmonic one (`ros-humble-ros-gzharmonic`, gz-transport13) — it can't talk to Fortress. Build ros_gz for Fortress (top-level README, *Install*); `source_sim.sh` overlays it |
 | `fix_base:=true` sim crawls (~1 step / 10 s), controllers time out | wheels buried in the ground. The fixed base spawns at z = 0.01 (base_link 0.11, wheels r = 0.105); don't lower it |
 | gripper controllers won't activate: `Not existing: [ left_gripper_joint/position ]` | the gripper's actuator link was dropped by urdf2sdf — fixed by `_inject_default_inertials` (movable-joint children get an inertial). If it's back, check that function still runs |
-| two demos fighting: arm goals `CONTROL_FAILED`, grasp targets switching by themselves | a demo/launch from an earlier run is still alive. The gz server *and* Python nodes survive Ctrl-C — `pkill -9 -f 'ign gazebo'; pkill -f jerrycan_demo; pkill -f move_group` |
+| two demos fighting: arm goals `CONTROL_FAILED`, grasp targets switching by themselves, `TF_OLD_DATA` for `jerrycan_*` frames | nodes from an earlier run are still alive. The gz server *and* the demo / `gz_pose_tf` nodes can survive Ctrl-C — `pkill -9 -f 'ign gazebo'; pkill -f jerrycan_demo; pkill -f transfer_demo; pkill -f gz_pose_tf; pkill -f move_group` |
+| a gripper controller stays `inactive`, spawner log: `A controller named … was already loaded` | the spawner's `load_controller` call timed out (>10 s, busy machine), its retry was refused and it exited. The demos activate such controllers themselves after 30 s |
 | RViz: `Could not … robot_description_semantic` / can't parse SRDF | the RViz node needs the SRDF — `sim_gazebo_moveit.launch.py` now passes `robot_description` + `robot_description_semantic` to it |
 | MoveIt: `The complete state of the robot is not yet known. Missing Base-0..3` | the wheel joints weren't in `ros2_control`; they're now added **state-only** so `/joint_states` is complete |
 

@@ -35,7 +35,7 @@ public:
     const auto world = declare_parameter<std::string>("world_name", "moz1_jerrycan");
     prefix_ = declare_parameter<std::string>("model_prefix", "");
     parent_ = declare_parameter<std::string>("parent_frame", "gz_world");
-    const double rate = declare_parameter<double>("rate", 20.0);
+    const double rate = declare_parameter<double>("rate", 50.0);
 
     tf_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     const std::string topic = "/world/" + world + "/dynamic_pose/info";

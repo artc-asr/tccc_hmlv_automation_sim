@@ -133,6 +133,10 @@ ros2 launch moz1_sim_gazebo sim_gazebo_full.launch.py
 # jerry-can depalletising demo: pallet of 4 L cans → both arms → infeed conveyors
 # (Gazebo headless, RViz shows everything; add gui:=true for the gz window)
 ros2 launch moz1_sim_gazebo sim_gazebo_jerrycan.launch.py
+
+# jerry-can transfer: both arms pick an empty pair, conveyor + filling (4.2 kg),
+# drive, place the filled pair on a second pallet's deck
+ros2 launch moz1_sim_gazebo sim_gazebo_transfer.launch.py
 ```
 
 For the nav launches, also run the costmap relay in a second terminal — the shared

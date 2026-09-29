@@ -41,7 +41,8 @@ import time
 import rclpy
 import yaml
 from control_msgs.action import FollowJointTrajectory
-from controller_manager_msgs.srv import ListControllers
+from builtin_interfaces.msg import Duration
+from controller_manager_msgs.srv import ConfigureController, ListControllers, SwitchController
 from geometry_msgs.msg import Point, Pose, Quaternion
 from moveit_msgs.action import ExecuteTrajectory, MoveGroup
 from moveit_msgs.msg import (AttachedCollisionObject, BoundingVolume, CollisionObject,
@@ -123,6 +124,10 @@ class JerrycanDemo(Node):
         self.apply_scene = self.create_client(ApplyPlanningScene, "/apply_planning_scene")
         self.list_controllers = self.create_client(ListControllers,
                                                    "/controller_manager/list_controllers")
+        self.configure_controller = self.create_client(
+            ConfigureController, "/controller_manager/configure_controller")
+        self.switch_controller = self.create_client(
+            SwitchController, "/controller_manager/switch_controller")
         self.target_pub = {s: self.create_publisher(String, f"/grasp/{s}/target", 10)
                            for s in ("left", "right")}
         self.weld_pub = {(s, a): self.create_publisher(Empty, f"/grasp/{s}/{a}", 10)
@@ -189,14 +194,18 @@ class JerrycanDemo(Node):
     def wait_for_servers(self):
         self.get_logger().info("waiting for the controllers to activate ...")
         needed = {f"{s}_{k}_controller" for s in ("left", "right") for k in ("arm", "gripper")}
+        t0 = time.monotonic()
         while True:
             if self.list_controllers.wait_for_service(timeout_sec=2.0):
                 res = self._wait(self.list_controllers.call_async(ListControllers.Request()),
                                  10.0, "list_controllers")
-                active = {c.name for c in res.controller if c.state == "active"}
-                if needed <= active:
+                state = {c.name: c.state for c in res.controller}
+                missing = sorted(n for n in needed if state.get(n) != "active")
+                if not missing:
                     break
-                self.get_logger().info(f"  ... not active yet: {sorted(needed - active)}")
+                self.get_logger().info(f"  ... not active yet: {missing}")
+                if time.monotonic() - t0 > 30.0:
+                    self._rescue_controllers(missing, state)
             time.sleep(3.0)
         self.get_logger().info("waiting for move_group ...")
         for c in [self.move, self.execute, *self.grippers.values()]:
@@ -205,6 +214,23 @@ class JerrycanDemo(Node):
         for c in (self.cartesian, self.apply_scene):
             while not c.wait_for_service(timeout_sec=2.0):
                 self.get_logger().info(f"  ... still waiting for {c.srv_name}")
+
+    def _rescue_controllers(self, names, state):
+        """The spawner gives up if load_controller takes > 10 s on a busy machine:
+        its retry is refused ("already loaded") and it exits, leaving the
+        controller loaded but never activated. Finish the job for it."""
+        for n in names:
+            if state.get(n) == "unconfigured":
+                self.get_logger().warn(f"{n}: loaded but never configured — configuring")
+                self._wait(self.configure_controller.call_async(
+                    ConfigureController.Request(name=n)), 20.0, "configure_controller")
+        loaded = [n for n in names if n in state]
+        if loaded:
+            self.get_logger().warn(f"activating {loaded} (the spawner gave up)")
+            req = SwitchController.Request(activate_controllers=loaded,
+                                           strictness=SwitchController.Request.BEST_EFFORT,
+                                           timeout=Duration(sec=10))
+            self._wait(self.switch_controller.call_async(req), 30.0, "switch_controller")
 
     # ------------------------------------------------------------ planning scene
     def _apply(self, scene):

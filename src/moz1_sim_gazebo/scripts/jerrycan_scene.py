@@ -211,17 +211,10 @@ def _can_geometry(scene, ox, oy, oz, prefix, stacked=False):
     return "\n        ".join(out)
 
 
-def world_sdf(scene):
-    c, p, cv = scene["container"], scene["pallet"], scene["conveyor"]
-    m = scene["mass"]
-    W, L, h = c["W"], c["L"], c["h"]
-    ixx = m / 12 * (L ** 2 + h ** 2)
-    iyy = m / 12 * (W ** 2 + h ** 2)
-    izz = m / 12 * (W ** 2 + L ** 2)
-
-    models = []
-    # pallet: deck boards + bottom boards + 9 blocks, one static collision box
-    x0, D, Lp, deck = p["x0"], p["depth"], p["length"], p["deck"]
+def pallet_model(name, x0, y0, p):
+    """EUR pallet (deck boards, bottom boards, 9 blocks; one static collision box)
+    whose near edge is at x0, centred on y0, the 1200 mm side facing -x."""
+    D, Lp, deck = p["depth"], p["length"], p["deck"]
     wood = "0.62 0.48 0.30 1"
     pv = []
     for i, yy in enumerate([-0.55, -0.35, -0.12, 0.12, 0.35, 0.55]):
@@ -234,14 +227,26 @@ def world_sdf(scene):
             pv.append(f'<visual name="block{i}{j}"><pose>{_f(xx, yy, deck / 2)} 0 0 0</pose>'
                       f"{_box_geom(0.10, 0.10 if abs(yy) > 0.5 else 0.145, deck - 0.044)}"
                       f"{_mat(wood)}</visual>")
-    models.append(f"""
+    return f"""
     <!-- EUR pallet 1200 x 1000 x 150 mm; robot works from the 1200 mm side -->
-    <model name="pallet"><static>true</static><pose>{_f(x0, 0, 0)} 0 0 0</pose>
+    <model name="{name}"><static>true</static><pose>{_f(x0, y0, 0)} 0 0 0</pose>
       <link name="link">
         <collision name="c"><pose>{_f(D / 2, 0, deck / 2)} 0 0 0</pose>{_box_geom(D, Lp, deck)}</collision>
         {chr(10).join(pv)}
       </link>
-    </model>""")
+    </model>"""
+
+
+def world_sdf(scene):
+    c, p, cv = scene["container"], scene["pallet"], scene["conveyor"]
+    m = scene["mass"]
+    W, L, h = c["W"], c["L"], c["h"]
+    ixx = m / 12 * (L ** 2 + h ** 2)
+    iyy = m / 12 * (W ** 2 + h ** 2)
+    izz = m / 12 * (W ** 2 + L ** 2)
+
+    models = []
+    models.append(pallet_model("pallet", p["x0"], 0.0, p))
 
     # static stack: one model, one set of boxes per can
     geo = "\n        ".join(_can_geometry(scene, *pos, prefix=f"c{i}_", stacked=True)

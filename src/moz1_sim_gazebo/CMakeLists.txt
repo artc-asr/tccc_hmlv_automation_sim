@@ -14,6 +14,14 @@ target_link_libraries(moz1_kinematic_grasp
   ignition-plugin1::register)
 install(TARGETS moz1_kinematic_grasp LIBRARY DESTINATION lib)
 
+# Conveyor with a filling station (see src/conveyor_belt.cc), a world plugin.
+add_library(moz1_conveyor_belt SHARED src/conveyor_belt.cc)
+target_compile_features(moz1_conveyor_belt PRIVATE cxx_std_17)
+target_link_libraries(moz1_conveyor_belt
+  ignition-gazebo6::ignition-gazebo6
+  ignition-plugin1::register)
+install(TARGETS moz1_conveyor_belt LIBRARY DESTINATION lib)
+
 # gz model poses -> ROS TF by model name, so RViz can show moving objects
 # (see src/gz_pose_tf.cc).
 find_package(rclcpp REQUIRED)
@@ -37,6 +45,7 @@ install(
 install(
   PROGRAMS scripts/scene_markers.py scripts/grasp_helper.py
            scripts/jerrycan_scene.py scripts/jerrycan_demo.py
+           scripts/transfer_scene.py scripts/transfer_demo.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
