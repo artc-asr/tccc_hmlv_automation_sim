@@ -43,6 +43,11 @@ torso_presets:
   crouch: [34.4, 68.8, 34.4, 0, 0]        # (0.6, 1.2, 0.6): upright, shoulders ~0.25 m lower
 pick_torsos: [home, reach, lean, reach_lean, crouch]
 deck_torsos: [crouch, reach]
+# Hands this high above the handles before going down into the box on pallet B
+# (default 0.12, the pre-grasp height, which clears the 10 cm walls by ~2 cm). With
+# 0.12 the G1's move over the box clipped the box wall with a held can and, planned
+# around it, once ended 11 cm off the slot.
+box_approach: 0.17
 
 # <side>_gripper_joint: 0 open (124 mm between the finger pads) .. 1.703 closed.
 # From the URDF: 0.6 ≈ 94 mm, 0.9 ≈ 70 mm, 1.2 ≈ 44 mm, 1.42 ≈ 25 mm. Close to

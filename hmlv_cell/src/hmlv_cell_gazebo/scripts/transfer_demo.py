@@ -719,8 +719,9 @@ class TransferDemo(JerrycanDemo):
         is — so a descent to the nominal height pushed the can's bottom into the
         pallet deck. The descent stops 3 cm short, measures where each can's
         bottom really is (Gazebo), and corrects the rest by that error (twice).
-        A sideways error over 5 mm (the can held off-centre, e.g. the hand lagging
-        when it closed) is corrected too, so the can goes down over its slot."""
+        A sideways error of 5-20 mm (the can held off-centre, e.g. the hand lagging
+        when it closed) is corrected too, so the can goes down over its slot; more
+        than 20 mm stops the demo."""
         gap = 0.003                             # can bottom above the surface at release
         place = {s: list(self.grasp_pose((slots[s][0], slots[s][1], slots[s][2] + gap)))
                  for s in SIDES}
@@ -749,6 +750,13 @@ class TransferDemo(JerrycanDemo):
             if step > 0 and all(abs(e) < 0.003 and math.hypot(*side_err[s]) <= 0.005
                                 for s, e in errs.items()):
                 break
+            for s in SIDES:
+                # more than that is not a can held a little off-centre: the arm is not
+                # where it was planned (caught on something) — don't steer it blind
+                if math.hypot(*side_err[s]) > 0.02:
+                    raise StepFailed(
+                        f"{names[s]} is {math.hypot(*side_err[s]) * 1000:.0f} mm off its "
+                        f"{what} slot sideways: the {s} arm is not where it was planned")
             target = {s: (t[0] - (side_err[s][0] if math.hypot(*side_err[s]) > 0.005 else 0.0),
                           t[1] - (side_err[s][1] if math.hypot(*side_err[s]) > 0.005 else 0.0),
                           t[2] - want - errs[s]) for s, t in target.items()}
@@ -894,11 +902,15 @@ class TransferDemo(JerrycanDemo):
         slots = s["b_slots"]
         deck = {s_: (slots[s_][0], slots[s_][1], slots[s_][2] + 0.003) for s_ in SIDES}
         quats = None
+        # hands this high above the handles before going down into the box (the
+        # robot profile's box_approach; the box walls are 10 cm)
+        box_h = self.robot.get("box_approach", PRE_GRASP)
+
         def reachable(torso):
             return all(self.dual_ik({s_: tuple(v + (dz if k == 2 else 0) for k, v in
                                                enumerate(self.grasp_pose(deck[s_])))
                                      for s_ in SIDES}, torso) is not None
-                       for dz in (PRE_GRASP, 0.0))
+                       for dz in (box_h, 0.0))
 
         # Straight after the drive the reach check has failed in ~1 s for every
         # pose that passes moments later: let the base and the loaded torso settle
@@ -919,7 +931,7 @@ class TransferDemo(JerrycanDemo):
             try:
                 self.torso_to(preset)
                 self.get_logger().info("  torso down: reaching out over the box")
-                quats = self.above(slots, PRE_GRASP)
+                quats = self.above(slots, box_h)
                 break
             except StepFailed as exc:
                 self.get_logger().info(f"  {exc} — trying the next torso pose")
