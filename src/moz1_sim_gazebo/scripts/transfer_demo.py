@@ -588,6 +588,20 @@ class TransferDemo(JerrycanDemo):
     def arms_home(self):
         self.dual_joint_goal(HOME, "home")
 
+    def go_home(self):
+        """Torso and both arms to the robot's home pose, together, in one direct
+        joint move; the base stays where it is. If that line collides, the torso
+        goes first, then the arms."""
+        goals = {"torso": (TORSO, [math.radians(d) for d in TORSO_PRESETS["home"]])}
+        goals.update({sd: (ARM_JOINTS[sd], HOME[sd]) for sd in SIDES})
+        if self._direct_joint(goals, 0.5 * 0.3):
+            self.settle("torso")
+            self.settle("dual")
+        else:
+            self.torso_to("home")
+            self.arms_home()
+        self.get_logger().info("home: torso and arms at home (base stays)")
+
     # --------------------------------------------------------------- the task
     def grasp_pose(self, bottom):
         """base_link tcp position for a can whose bottom centre is at `bottom` (gz)."""
@@ -862,8 +876,7 @@ class TransferDemo(JerrycanDemo):
         if quats is None:
             raise StepFailed("the box on pallet B is out of reach for every torso pose")
         self.place_pair(names, slots, quats, "pallet-B box")
-        self.torso_to("home")
-        self.arms_home()
+        self.go_home()
         self.get_logger().info("done: both filled jerry cans verified in the box on pallet B")
 
 
