@@ -39,20 +39,24 @@ torso_controller: torso_controller
 #   carry                    hip 48, knee 7, waist 52 N·m (hips back, chest upright)
 #   placing on the deck: low_lean 79, lean75 93 N·m at the hip (deep 77, but see
 #   deck_torsos)
+# Every preset stays >= 2 deg inside the joint limits (URDF: hip LegWaist-1 +-90,
+# knee LegWaist-2 -145..+1, waist LegWaist-3 -10..+80). A joint parked ON its
+# limit stayed there in Gazebo: after low_lean (then 90, -150, 80) the move home
+# left the hip at 90 and the waist at 80 — the torso ended bent forward.
 torso_presets:
   home: [0, 60, -90, 30, 0, 0]
   lean45: [0, 60, -90, 45, 0, 0]
   lean60: [0, 60, -90, 60, 0, 0]
   lean75: [0, 60, -90, 75, 0, 0]
-  deep: [0, 85, -145, 75, 0, 0]
-  low_lean: [0, 90, -150, 80, 0, 0]
+  deep: [0, 85, -143, 75, 0, 0]
+  low_lean: [0, 88, -143, 78, 0, 0]
   carry: [0, 50, -100, 40, 0, 0]
   # far reach: hips forward as well as the waist. Pallet A's 5th row on the
   # lower level (handles 0.93 m out, 0.51 m up in base_link) is out of reach
   # for every pose above; an IK sweep (hip 60-90, knee -60..-145, waist 70/80)
   # reaches it with these two and their neighbours.
   reach70: [0, 70, -90, 70, 0, 0]
-  reach80: [0, 80, -90, 80, 0, 0]
+  reach80: [0, 80, -90, 78, 0, 0]
 # least lean first; the crouches last, for a low stack (layers:=2: handles at 0.62 m)
 pick_torsos: [home, lean45, lean60, lean75, reach70, reach80, deep, low_lean]
 # Placing on the deck, loaded. Not "deep": with 8.4 kg in hand the arms can't hold
