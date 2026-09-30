@@ -1,6 +1,7 @@
 // HMLV transfer replay: plays back a run recorded by hmlv_cell_gazebo/record_run.py
 // (built into data/ by tools/web_replay/build.py). ROS frames are z-up, so the
-// whole view is z-up (camera.up = +z).
+// whole view is z-up (camera.up = +z). One robot (data/<robot>/robot/), or two
+// (data/duo/: run.robots, each model under its own dir).
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { mergeGeometries, toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -135,11 +136,11 @@ function buildScene(data) {
   }
 }
 
-// ------------------------------------------------------------------ robot (URDF)
-let robot = null;
-let rootToBaseInv = new THREE.Matrix4();
+// ------------------------------------------------------------------ robots (URDF)
+// one rig per robot: {model, rootToBaseInv, jointIdx: [[urdf joint, column]], base, joints}
+const rigs = [];
 
-function loadRobot(onProgress) {
+function loadRobot(url, onProgress) {
   return new Promise((resolve, reject) => {
     const manager = new THREE.LoadingManager();
     const loader = new URDFLoader(manager);
@@ -154,7 +155,7 @@ function loadRobot(onProgress) {
     manager.onProgress = (_url, done, total) => onProgress(done, total);
     manager.onLoad = () => (model ? resolve(model) : null);
     manager.onError = (url) => reject(new Error(`could not load ${url}`));
-    loader.load(`${DATA}robot/robot.urdf`, (m) => {
+    loader.load(url, (m) => {
       model = m;
       if (manager.itemsLoaded >= manager.itemsTotal) resolve(model);
     });
@@ -175,10 +176,11 @@ function prepareRobot(model) {
   // the recording has base_link in the world; the URDF may hang it below another root
   model.updateMatrixWorld(true);
   const base = model.links.base_link;
-  if (base && base !== model) rootToBaseInv = base.matrixWorld.clone().invert();
+  const rootToBaseInv = base && base !== model ? base.matrixWorld.clone().invert()
+    : new THREE.Matrix4();
   model.matrixAutoUpdate = false;
   scene.add(model);
-  robot = model;
+  return { model, rootToBaseInv };
 }
 
 // ------------------------------------------------------------------ recording
@@ -207,12 +209,13 @@ function poseAt(track, i, f, out) {
 }
 
 function buildSegments() {
-  const byKey = new Map(PHASES.map(([k, label, desc]) => [k, { key: k, label, desc }]));
+  const defs = run.phase_defs ?? PHASES;       // the duo replay brings its own
+  const byKey = new Map(defs.map(([k, label, desc]) => [k, { key: k, label, desc }]));
   const reached = run.phases.filter((p) => byKey.has(p.phase));
   const failed = run.phases.some((p) => p.phase === "failed");
   t0 = Math.max(run.t[0], (reached[0]?.t ?? run.t[0]) - LEAD_IN);
   t1 = run.t[run.t.length - 1];
-  segs = PHASES.map(([k]) => ({ ...byKey.get(k), t: null, end: null, failed: false }));
+  segs = defs.map(([k]) => ({ ...byKey.get(k), t: null, end: null, failed: false }));
   reached.forEach((p, i) => {
     const s = segs.find((x) => x.key === p.phase);
     s.t = p.t;
@@ -221,7 +224,7 @@ function buildSegments() {
   if (failed && reached.length) segs.find((x) => x.key === reached.at(-1).phase).failed = true;
   // "done" is instantaneous: give it the tail of the recording
   const done = segs.find((s) => s.key === "done");
-  if (done.t !== null) done.end = t1;
+  if (done && done.t !== null) done.end = t1;
 }
 
 function renderPhaseList() {
@@ -271,7 +274,6 @@ let t = 0;                    // recording time
 let playing = false, started = false, speed = 2;
 let follow = false;
 const _m = new THREE.Matrix4();
-const jointIdx = [];          // [urdf joint, column]
 
 function apply(time) {
   t = Math.min(Math.max(time, t0), t1);
@@ -279,11 +281,11 @@ function apply(time) {
   const ta = run.t[i], tb = run.t[Math.min(i + 1, run.t.length - 1)];
   const f = tb > ta ? Math.min(1, (t - ta) / (tb - ta)) : 0;
 
-  if (robot) {
-    const a = run.joints[i], b = run.joints[Math.min(i + 1, run.joints.length - 1)];
-    for (const [joint, c] of jointIdx) joint.setJointValue(a[c] + (b[c] - a[c]) * f);
-    robot.matrix.multiplyMatrices(poseAt(run.base, i, f, _m), rootToBaseInv);
-    robot.matrixWorldNeedsUpdate = true;
+  for (const rig of rigs) {
+    const a = rig.joints[i], b = rig.joints[Math.min(i + 1, rig.joints.length - 1)];
+    for (const [joint, c] of rig.jointIdx) joint.setJointValue(a[c] + (b[c] - a[c]) * f);
+    rig.model.matrix.multiplyMatrices(poseAt(rig.base, i, f, _m), rig.rootToBaseInv);
+    rig.model.matrixWorldNeedsUpdate = true;
   }
   for (const [name, m] of Object.entries(liveModels)) {
     if (run.cans[name]) poseAt(run.cans[name], i, f, m.group.matrix);
@@ -373,8 +375,8 @@ function frame() {
     apply(t + dt * speed);
     if (t >= t1) { playing = false; setButton(); }
   }
-  if (follow && robot) {
-    _basePos.setFromMatrixPosition(robot.matrix);
+  if (follow && rigs.length) {
+    _basePos.setFromMatrixPosition(rigs[0].model.matrix);
     _basePos.z = 0.6;
     _delta.subVectors(_basePos, controls.target).multiplyScalar(Math.min(1, dt * 4));
     controls.target.add(_delta);
@@ -429,11 +431,19 @@ if ([1, 2, 4, 8].includes(askedSpeed)) {
     buildScene(sceneData);
     buildSegments();
     renderPhaseList();
-    const model = await loadRobot((done, total) => {
-      $("loading-text").textContent = `Loading robot model… ${done}/${total}`;
-    });
-    prepareRobot(model);
-    run.joint_names.forEach((n, c) => { if (model.joints[n]) jointIdx.push([model.joints[n], c]); });
+    // one robot: data/<id>/robot/; two: run.robots, each under its own dir
+    const sources = run.robots ?? [{ dir: "robot/", joint_names: run.joint_names,
+                                     joints: run.joints, base: run.base, label: robot.label }];
+    for (const src of sources) {
+      const model = await loadRobot(`${DATA}${src.dir}robot.urdf`, (done, total) => {
+        $("loading-text").textContent = `Loading ${src.label ?? "robot"} model… ${done}/${total}`;
+      });
+      const rig = { ...prepareRobot(model), jointIdx: [], base: src.base, joints: src.joints };
+      src.joint_names.forEach((n, c) => {
+        if (model.joints[n]) rig.jointIdx.push([model.joints[n], c]);
+      });
+      rigs.push(rig);
+    }
     // ?t=<seconds> opens the replay at that moment
     const at = Number(params.get("t"));
     if (at > 0) { started = true; apply(t0 + at); } else apply(t0);

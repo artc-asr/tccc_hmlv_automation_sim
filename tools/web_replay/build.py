@@ -34,7 +34,30 @@ import trimesh
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "docs" / "data"
-LABELS = {"moz1": "Spirit AI Moz1", "g1": "Galbot G1"}
+LABELS = {"moz1": "Spirit AI Moz1", "g1": "Galbot G1", "duo": "G1 + Moz1"}
+# The duo replay's steps (record_run.py: "<ns>:<step>" per robot, the line's from
+# /duo/phase), listed in the order they happened in the run.
+DUO_PHASES = {
+    "cycle": ("Line starts", "Two filled cans wait at the belt's unload end, two empty "
+              "under the filler. The G1 stands at pallet A, the Moz1 at the unload end."),
+    "g1:pick_a": ("G1 · pick empties at pallet A", "4 layers, row 4: the torso leans over "
+                  "the stack and both arms pick a pair at once (0.2 kg each)."),
+    "moz1:pick_filled": ("Moz1 · pick the filled pair", "Both arms lift 8.4 kg off the "
+                         "belt's unload end and curl in; torso to its carry pose."),
+    "moz1:drive_b": ("Moz1 · carry to pallet B", "A gentle drive with the load (0.12 m/s)."),
+    "moz1:place_box": ("Moz1 · place into the box", "Crouch with the arms curled, then "
+                       "reach over the box on the deck and set both cans down."),
+    "g1:drive_load": ("G1 · carry to the belt", "Hands over the belt slots, then drive to "
+                      "the load station."),
+    "g1:place_conveyor": ("G1 · set the empties on the belt", "Guarded descent: stop 3 cm "
+                          "short, measure in Gazebo, correct the rest."),
+    "conveyor": ("Fill & index", "Both pairs placed: the filler fills the middle pair "
+                 "(4.2 kg, red), then the belt moves everything one station."),
+    "moz1:home": ("Moz1 · back to the unload end", "Home pose, then drive back."),
+    "g1:home": ("G1 · back to pallet A", "Home pose, then drive back."),
+    "done": ("Line back at its start", "Filled pair at the unload end, the G1's pair under "
+             "the filler: ready for the next cycle."),
+}
 
 
 # ------------------------------------------------------------------ robot model
@@ -196,6 +219,28 @@ def build_run(rec, movable):
             "phases": rec["phases"], "logs": rec["logs"], "recolors": rec["recolors"]}
 
 
+def build_duo(a, rec):
+    """Two robots: each model under robot_<ns>/, one run.json with a `robots` list."""
+    robots = []
+    budget = a.face_budget // len(rec["robots"])
+    for ns, r in rec["robots"].items():
+        movable = build_robot((a.run_dir / f"robot_{ns}.urdf").read_text(),
+                              a.out / f"robot_{ns}", budget)
+        keep = [i for i, n in enumerate(r["joint_names"]) if n in movable]
+        robots.append({"id": ns, "label": LABELS.get(ns, ns), "dir": f"robot_{ns}/",
+                       "joint_names": [r["joint_names"][i] for i in keep],
+                       "joints": [[row[i] for i in keep] for row in r["joints"]],
+                       "base": r["base"]})
+    run = build_run(dict(rec, joint_names=[], joints=[], base=[]), set())
+    first = {}
+    for p in rec["phases"]:
+        first.setdefault(p["phase"], p["t"])
+    defs = sorted((k for k in DUO_PHASES if k in first), key=lambda k: first[k])
+    run.update(robot="duo", robots=robots, joint_names=[], joints=[], base=[],
+               phase_defs=[[k, *DUO_PHASES[k]] for k in defs])
+    return run
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("run_dir", type=Path)
@@ -208,10 +253,15 @@ def main():
     a.out = a.out or DATA / (rec.get("robot") or "robot")
     if a.out.exists():
         shutil.rmtree(a.out)
-    (a.out / "robot").mkdir(parents=True)
-    movable = build_robot((a.run_dir / "robot.urdf").read_text(), a.out / "robot",
-                          a.face_budget)
-    run = build_run(rec, movable)
+    if "robots" in rec:
+        for ns in rec["robots"]:
+            (a.out / f"robot_{ns}").mkdir(parents=True)
+        run = build_duo(a, rec)
+    else:
+        (a.out / "robot").mkdir(parents=True)
+        movable = build_robot((a.run_dir / "robot.urdf").read_text(), a.out / "robot",
+                              a.face_budget)
+        run = build_run(rec, movable)
     scene = build_scene(a.run_dir / "world.sdf", set(rec["cans"]))
     (a.out / "run.json").write_text(json.dumps(run, separators=(",", ":")))
     (a.out / "scene.json").write_text(json.dumps(scene, separators=(",", ":")))

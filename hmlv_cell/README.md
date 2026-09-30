@@ -26,6 +26,40 @@ a leftover Gazebo server or demo node hijacks the next run.
 | `gui` / `rviz` | `false` / `true` | Gazebo's own window / the RViz view |
 | `spawn_delay` | `8.0` | s between the spawn and the controller spawners |
 
+## The duo demo: G1 + Moz1 in one cell
+
+```bash
+ros2 launch hmlv_cell_gazebo duo.launch.py        # or ./sim.sh cell duo.launch.py
+```
+
+Both robots in one world, the line in steady state (`scripts/duo_scene.py`): two
+**filled** cans at the belt's unload end, two **empty** ones under the filling
+station, now in the middle of the belt. Concurrently, the **G1** picks an empty pair
+from pallet A and sets it on the load station, and the **Moz1** takes the filled
+pair from the unload end into the box on pallet B. Then the belt
+(`src/indexing_conveyor.cc`) fills the pair under the filler and indexes everything
+one station, while both robots drive back to their starts: the line is where it
+began (`scripts/duo_demo.py`'s supervisor checks it against Gazebo).
+
+How two robots share one world (`launch/duo.launch.py`; neither robot package is
+changed):
+- each robot lives in its own namespace, `/g1` and `/moz1`: controller manager,
+  `robot_state_publisher`, `move_group`, `grasp_helper`, the demo node,
+  `cmd_vel` / `odom`, and its own TF tree (`/<ns>/tf`: both have a `base_link`);
+  the launch rewrites each robot description for that (gz_ros2_control's
+  `<ros><namespace>`, the base plugins' topics);
+- `gz_ros2_control` runs every robot's controller manager in the one gz process and
+  only the first to start passes its ROS arguments, so both read ONE controllers
+  file with fully qualified keys (`/g1/controller_manager`, …);
+- the two robots' controllers are spawned one robot after the other: loading the
+  same controller library from two controller managers at once hit a pluginlib race;
+- `transfer_demo.py` uses relative names, so its steps run unchanged in a namespace;
+- Gazebo transport is pinned to loopback (`IGN_IP=127.0.0.1` in `source_sim.sh`): a
+  Wi-Fi address change mid-run cut the demo off from Gazebo's pose queries.
+
+`record:=<dir>` records both robots; `tools/web_replay/build.py <dir>` builds
+`docs/data/duo/` (the page's "G1 + Moz1").
+
 ## The sequence
 
 | station (base y) | what happens |

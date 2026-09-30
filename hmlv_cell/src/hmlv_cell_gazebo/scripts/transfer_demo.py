@@ -105,32 +105,64 @@ class TransferDemo(JerrycanDemo):
             "wrist_min": math.radians(f["wrist_min"]), "tries": f.get("tries", 10),
             "path_margin": math.radians(f.get("path_margin", f["limit_margin"]))}
         self.get_logger().info(f"robot: {r['label']}")
+        # The robot's own interfaces by RELATIVE names: in the root namespace they
+        # are the absolute names they always were; with two robots in one world
+        # (duo.launch.py) each robot's nodes run in /g1 or /moz1 and these resolve
+        # under it. JerrycanDemo names its clients absolutely: rebound here.
+        self._relative_clients()
         self.odom = None
-        self.create_subscription(Odometry, "/odom", self._on_odom, 10)
-        self.cmd_vel = self.create_publisher(Twist, "/cmd_vel", 10)
-        self.ik = self.create_client(GetPositionIK, "/compute_ik")
-        self.validity = self.create_client(GetStateValidity, "/check_state_validity")
+        self.create_subscription(Odometry, "odom", self._on_odom, 10)
+        self.cmd_vel = self.create_publisher(Twist, "cmd_vel", 10)
+        self.ik = self.create_client(GetPositionIK, "compute_ik")
+        self.validity = self.create_client(GetStateValidity, "check_state_validity")
         self.arm_fjt = {s: ActionClient(self, FollowJointTrajectory,
-                                        f"/{s}_arm_controller/follow_joint_trajectory")
+                                        f"{s}_arm_controller/follow_joint_trajectory")
                         for s in SIDES}
         self.conveyor_start = self.create_publisher(Empty, "/conveyor/start", 10)
         # direct joint-space moves (see _direct_joint), per controller
         self.fjt = dict(self.arm_fjt, torso=ActionClient(
-            self, FollowJointTrajectory, f"/{r['torso_controller']}/follow_joint_trajectory"))
+            self, FollowJointTrajectory, f"{r['torso_controller']}/follow_joint_trajectory"))
         self.recolor_pub = self.create_publisher(String, "/scene_markers/recolor", 10)
         self.phase_pub = self.create_publisher(
-            String, "/transfer_demo/phase",
+            String, "transfer_demo/phase",
             QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL))
         self.conveyor_done = threading.Event()
         self.create_subscription(Empty, "/conveyor/done",
                                  lambda _m: self.conveyor_done.set(), 10)
         self.joints = {}
-        self.create_subscription(JointState, "/joint_states",
+        self.create_subscription(JointState, "joint_states",
                                  lambda m: self.joints.update(zip(m.name, m.position)), 10)
         # MoveIt world objects, kept in gz world coordinates so they can be
         # re-expressed in base_link whenever the base has moved:
         #   name -> ("box", center, size) | ("can", bottom, body_only)
         self.objects = {}
+
+    def _relative_clients(self):
+        """JerrycanDemo's MoveIt / controller / grasp interfaces, by relative names."""
+        from controller_manager_msgs.srv import (ConfigureController, ListControllers,
+                                                 SwitchController)
+        from moveit_msgs.action import ExecuteTrajectory, MoveGroup
+        from moveit_msgs.srv import ApplyPlanningScene
+        self.move = ActionClient(self, MoveGroup, "move_action")
+        self.execute = ActionClient(self, ExecuteTrajectory, "execute_trajectory")
+        self.grippers = {s: ActionClient(self, FollowJointTrajectory,
+                                         f"{s}_gripper_controller/follow_joint_trajectory")
+                         for s in SIDES}
+        self.cartesian = self.create_client(GetCartesianPath, "compute_cartesian_path")
+        self.apply_scene = self.create_client(ApplyPlanningScene, "apply_planning_scene")
+        self.list_controllers = self.create_client(ListControllers,
+                                                   "controller_manager/list_controllers")
+        self.configure_controller = self.create_client(
+            ConfigureController, "controller_manager/configure_controller")
+        self.switch_controller = self.create_client(
+            SwitchController, "controller_manager/switch_controller")
+        self.target_pub = {s: self.create_publisher(String, f"grasp/{s}/target", 10)
+                           for s in SIDES}
+        self.weld_pub = {(s, a): self.create_publisher(Empty, f"grasp/{s}/{a}", 10)
+                         for s in SIDES for a in ("attach", "detach")}
+        if self.get_namespace() != "/":     # JerrycanDemo's /joint_states is another robot's
+            self.create_subscription(JointState, "joint_states",
+                                     lambda m: self.joint_vel.update(zip(m.name, m.velocity)), 10)
 
     def phase(self, name):
         """Publish the step run() is on (PHASES, or "failed")."""
@@ -957,30 +989,31 @@ class TransferDemo(JerrycanDemo):
         self.get_logger().warn("no tuck planned: carrying with the arms out")
         return quats
 
-    def run(self):
+    # ------------------------------------------------------------- the steps
+    def startup(self):
+        """Controllers, move_group and /odom up."""
         self.wait_for_servers()
         for c in [self.ik]:
             while not c.wait_for_service(timeout_sec=2.0):
-                self.get_logger().info("  ... still waiting for /compute_ik")
+                self.get_logger().info("  ... still waiting for compute_ik")
         for c in self.arm_fjt.values():
             c.wait_for_server()
         while self.odom is None:
-            self.get_logger().info("  ... waiting for /odom")
+            self.get_logger().info("  ... waiting for odom")
             time.sleep(1.0)
-        s = self.scene
-        st = s["stations"]
-        off = s["belt_offset"]
-        top = s["conveyor"]["top"]
-        self.get_logger().info(
-            f"4 L jerry cans: {s['empty_mass']} kg empty, {s['filled_mass']} kg filled. "
-            f"One pair: pallet A → conveyor → filling → box on pallet B")
-        self.phase("drive_a")
-        self.drive_to(*st["A"], "pallet A")
-        self.phase("pick_a")
-        self.setup_scene()
-        self.dual_gripper(self.g_approach)
 
-        # --- pallet A: pick the empty pair
+    def belt_slots(self, station):
+        """{side: can-bottom gz position} of the pair's slots at a conveyor station."""
+        s = self.scene
+        belt_x = (s["conveyor"]["x_min"] + s["conveyor"]["x_max"]) / 2
+        y, off, top = s["stations"][station][1], s["belt_offset"], s["conveyor"]["top"]
+        return {"left": [belt_x, y + off, top], "right": [belt_x, y - off, top]}
+
+    def pick_from_pallet_a(self):
+        """At pallet A: pick the empty pair (least torso change that reaches it),
+        pull it out of the row, torso back home. Returns (names, quats)."""
+        s = self.scene
+        self.dual_gripper(self.g_approach)
         pair, preset, pre_arms = self.select_pick()
         names = {s_: pair[s_]["name"] for s_ in SIDES}
         # the cans left behind: full height again (handles included), so nothing
@@ -999,15 +1032,6 @@ class TransferDemo(JerrycanDemo):
         # and a free-space path out of a tightly packed row clips the neighbours.
         quats = self.pick_pair(names, bottoms, LIFT_CLEAR, "pallet-A", self.pick_approach)
         self.get_logger().info("picked both (empty, 0.2 kg each)")
-        belt_x = (s["conveyor"]["x_min"] + s["conveyor"]["x_max"]) / 2
-        load = {"left": [belt_x, st["load"][1] + off, top],
-                "right": [belt_x, st["load"][1] - off, top]}
-        # carry pose: hands over where the belt slots will be, relative to the base,
-        # the cans PRE_GRASP above the belt — or, standing at pallet A still, clear
-        # of the stack under the top layer if that is higher (4 layers: 0.87 m)
-        carry_z = max(top + PRE_GRASP, s["stack_top"] - s["container"]["h"] + LIFT_CLEAR)
-        carry = {s_: self.grasp_pose([load[s_][0], load[s_][1] - st["load"][1] + st["A"][1],
-                                      carry_z]) for s_ in SIDES}
         # Out of the row: a short straight pull clear of the row's other cans (4 mm
         # beside the pair), then the torso straight back up with the arms as they
         # are — the cans rise and come back with the chest. Folding the arms in
@@ -1020,15 +1044,32 @@ class TransferDemo(JerrycanDemo):
                                    for s_ in SIDES}, quats, "the pull out of the row", speed=0.1)
         if preset != "home":
             self.torso_to("home")
+        return names, quats
 
-        # --- conveyor, load station: both cans side by side on the belt
+    def place_on_belt(self, names, quats, station="load"):
+        """From pallet A: hands to the carry pose, drive to `station`, set the pair on
+        the belt side by side."""
+        s = self.scene
+        st = s["stations"]
+        load = self.belt_slots(station)
+        # carry pose: hands over where the belt slots will be, relative to the base,
+        # the cans PRE_GRASP above the belt — or, standing at pallet A still, clear
+        # of the stack under the top layer if that is higher (4 layers: 0.87 m)
+        carry_z = max(s["conveyor"]["top"] + PRE_GRASP,
+                      s["stack_top"] - s["container"]["h"] + LIFT_CLEAR)
+        carry = {s_: self.grasp_pose([load[s_][0], load[s_][1] - st[station][1] + st["A"][1],
+                                      carry_z]) for s_ in SIDES}
         self.phase("drive_load")
         quats = self.dual_move_to(carry, quats, "to the carry pose")
-        self.drive_to(*st["load"], "conveyor load")
+        self.drive_to(*st[station], f"conveyor {station}")
         self.phase("place_conveyor")
         self.place_pair(names, load, quats, "conveyor")
+        return load
 
-        # --- conveyor: carry to the filling station
+    def run_conveyor(self, names, load):
+        """Carry the pair on the belt to the filling station and unload end. Returns
+        where it ends up."""
+        s = self.scene
         self.phase("conveyor")
         self.get_logger().info("conveyor running → filling station ...")
         self.conveyor_done.clear()
@@ -1042,12 +1083,17 @@ class TransferDemo(JerrycanDemo):
         for s_ in SIDES:        # Gazebo recolours them itself; RViz draws the world file
             self.recolor_pub.publish(String(data=f"{names[s_]} {s['filled_rgba']}"))
         self.get_logger().info(f"delivered and filled: {s['filled_mass']} kg each (now red)")
+        return unload
 
-        # --- unload station: pick the filled pair
+    def pick_from_belt(self, names, where, station="unload"):
+        """Drive to `station` (if not there), pick the FILLED pair standing at
+        `where` ({side: can bottom}), curl the arms in, torso to its carry pose.
+        Returns quats."""
+        s = self.scene
         self.phase("drive_unload")
-        self.drive_to(*st["unload"], "conveyor unload")
+        self.drive_to(*s["stations"][station], f"conveyor {station}")
         self.phase("pick_filled")
-        bottoms = {s_: self.locate(names[s_], unload[s_], tol=0.04) for s_ in SIDES}
+        bottoms = {s_: self.locate(names[s_], where[s_], tol=0.04) for s_ in SIDES}
         quats = self.pick_pair(names, bottoms, PRE_GRASP + 0.05, "filled")
         self.get_logger().info(f"picked both (filled, {s['filled_mass']} kg each)")
         # Curl the arms in first: the 8.4 kg comes toward the chest, which takes
@@ -1057,13 +1103,16 @@ class TransferDemo(JerrycanDemo):
         # the hands 0.53 m out the hip joint carries ~81 of its 100 N·m and the torso
         # folded under the drive; carry brings it to ~48 N·m — see robots/moz1.yaml.)
         self.torso_to("carry")
+        return quats
 
-        # --- pallet B: into the open box on the deck (loaded: drive gently).
-        # The torso goes down with the arms still curled, and only then do the arms
-        # reach out over the box: the load is extended only once its centre of
-        # gravity is low.
+    def place_in_box(self, names, quats):
+        """Drive to pallet B (gently: loaded) and place the pair into the open box.
+        The torso goes down with the arms still curled, and only then do the arms
+        reach out over the box: the load is extended only once its centre of
+        gravity is low."""
+        s = self.scene
         self.phase("drive_b")
-        self.drive_to(*st["B"], "pallet B", vmax=0.12, accel=0.15)
+        self.drive_to(*s["stations"]["B"], "pallet B", vmax=0.12, accel=0.15)
         self.phase("place_box")
         slots = s["b_slots"]
         deck = {s_: (slots[s_][0], slots[s_][1], slots[s_][2] + 0.003) for s_ in SIDES}
@@ -1071,6 +1120,7 @@ class TransferDemo(JerrycanDemo):
         # orientation they hold the cans with (G1: a flipped wrist swung one filled
         # can into the other)
         held = quats if self.robot.get("keep_grasp_yaw") else None
+        quats_held = quats
         quats = None
         # hands this high above the handles before going down into the box (the
         # robot profile's box_approach; the box walls are 10 cm)
@@ -1099,7 +1149,18 @@ class TransferDemo(JerrycanDemo):
                 continue
             self.get_logger().info(f"pallet B box: torso '{preset}', arms curled")
             try:
-                self.torso_to(preset)
+                try:
+                    self.torso_to(preset)
+                except StepFailed as exc:
+                    # Crouching with the cans curled in can bring a knee onto a held
+                    # can (Moz1: leg03 / the left can, with some tuck solutions): hands
+                    # 10 cm back out, then the crouch again.
+                    self.get_logger().info(f"  {exc} — hands 10 cm out, then again")
+                    now = {s_: self.tcp_now(s_) for s_ in SIDES}
+                    held = self.dual_move_to({s_: (p[0] + 0.10, p[1], p[2])
+                                              for s_, p in now.items()},
+                                             held or quats_held, "the hands out", speed=0.1)
+                    self.torso_to(preset)
                 self.get_logger().info("  torso down: reaching out over the box")
                 quats = self.above(slots, box_h, held)
                 break
@@ -1108,6 +1169,23 @@ class TransferDemo(JerrycanDemo):
         if quats is None:
             raise StepFailed("the box on pallet B is out of reach for every torso pose")
         self.place_pair(names, slots, quats, "pallet-B box")
+
+    def run(self):
+        """One pair through the whole line, by one robot."""
+        self.startup()
+        s = self.scene
+        self.get_logger().info(
+            f"4 L jerry cans: {s['empty_mass']} kg empty, {s['filled_mass']} kg filled. "
+            f"One pair: pallet A → conveyor → filling → box on pallet B")
+        self.phase("drive_a")
+        self.drive_to(*s["stations"]["A"], "pallet A")
+        self.phase("pick_a")
+        self.setup_scene()
+        names, quats = self.pick_from_pallet_a()
+        load = self.place_on_belt(names, quats)
+        unload = self.run_conveyor(names, load)
+        quats = self.pick_from_belt(names, unload)
+        self.place_in_box(names, quats)
         self.phase("home")
         self.go_home()
         self.phase("done")

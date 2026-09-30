@@ -66,7 +66,8 @@ torso_presets:
 # only poses that don't tip the robot (reach, reach_lean do, from row 4 on). With
 # ik_filter (below) the sweep finds row 4 cleanly only from lean (8 cm approach,
 # see pick_approach) and stretch (centre of mass 0.148 m: least tipping margin).
-pick_torsos: [home, lean, stretch]
+# (not home: it never reaches row 4 — its failed reach check only costs ~10 s)
+pick_torsos: [lean, stretch]
 # The box on the floor. Not crouch any more: it reaches the box only with an arm
 # joint on its limit (ik_filter); floor_lean 0.117 m, floor_back 0.070 m.
 deck_torsos: [floor_lean, floor_back]
@@ -108,7 +109,11 @@ tuck_straight_only: true
 # times from seeds around the current arm; straight-line paths only within the
 # limit margin (else the move goes joint-space to such a solution).
 # path_margin (deg): straight-line paths only have to stay that far off the stops.
-ik_filter: {limit_margin: 4.0, path_margin: 1.0, wrist_joint: 6, wrist_min: 8.0, tries: 10}
+# tries: about 13% of KDL's answers at lean's pallet-A pre-grasp pass the filter, so
+# at 10 tries per grasp yaw the reach check missed lean ~1 run in 8 (and took
+# stretch, whose pull out of the row then ran a joint into its limit); 25 makes
+# that ~1 in 1000.
+ik_filter: {limit_margin: 4.0, path_margin: 1.0, wrist_joint: 6, wrist_min: 8.0, tries: 25}
 
 # <side>_gripper_joint: 0 open (124 mm between the finger pads) .. 1.703 closed.
 # From the URDF: 0.6 ≈ 94 mm, 0.9 ≈ 70 mm, 1.2 ≈ 44 mm, 1.42 ≈ 25 mm (the 24 mm

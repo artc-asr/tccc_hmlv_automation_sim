@@ -7,6 +7,10 @@
   {
    "id": "g1",
    "label": "Galbot G1"
+  },
+  {
+   "id": "duo",
+   "label": "G1 + Moz1"
   }
  ]
 }

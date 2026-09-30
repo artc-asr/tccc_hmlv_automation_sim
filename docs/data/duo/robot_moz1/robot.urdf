@@ -1,0 +1,1050 @@
+<robot name="moz1">
+  <material name="moz1_grey">
+    <color rgba="0.8 0.8 0.8 1.0" />
+  </material>
+  <material name="moz1_light">
+    <color rgba="0.89804 0.91765 0.92941 1.0" />
+  </material>
+  
+  <material name="moz1_placeholder">
+    <color rgba="0.95 0.55 0.10 1.0" />
+  </material>
+  <material name="moz1_sensor">
+    <color rgba="0.10 0.45 0.85 1.0" />
+  </material>
+  
+  
+  
+  <link name="base_link" />
+  <link name="moz1_chassis">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/base_link.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="moz1_chassis_joint" type="fixed">
+    <origin rpy="0 0 1.5707963267948966" xyz="0 0 0" />
+    <parent link="base_link" />
+    <child link="moz1_chassis" />
+  </joint>
+  
+  <link name="base_footprint" />
+  <joint name="base_footprint_joint" type="fixed">
+    
+    <origin rpy="0 0 0" xyz="0 0 -0.0" />
+    <parent link="base_link" />
+    <child link="base_footprint" />
+  </joint>
+  <link name="wheel01">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/wheel.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="Base-0" type="continuous">
+    <origin rpy="0 0 2.35619449" xyz="0.2423 0.2423 0" />
+    <parent link="moz1_chassis" />
+    <child link="wheel01" />
+    <axis xyz="0 1 0" />
+  </joint>
+  <link name="wheel02">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/wheel.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="Base-1" type="continuous">
+    <origin rpy="0 0 -2.35619449" xyz="-0.2423 0.2423 0" />
+    <parent link="moz1_chassis" />
+    <child link="wheel02" />
+    <axis xyz="0 1 0" />
+  </joint>
+  <link name="wheel03">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/wheel.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="Base-2" type="continuous">
+    <origin rpy="0 0 -0.785398163" xyz="-0.2423 -0.2423 0" />
+    <parent link="moz1_chassis" />
+    <child link="wheel03" />
+    <axis xyz="0 1 0" />
+  </joint>
+  <link name="wheel04">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/wheel.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="Base-3" type="continuous">
+    <origin rpy="0 0 0.785398163" xyz="0.2423 -0.2423 0" />
+    <parent link="moz1_chassis" />
+    <child link="wheel04" />
+    <axis xyz="0 1 0" />
+  </joint>
+  <link name="leg01">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/leg01.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="LegWaist-0" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0.1114 0.1875" />
+    <parent link="moz1_chassis" />
+    <child link="leg01" />
+    <axis xyz="0 1 0" />
+    <limit effort="100.0" lower="-0.523598776" upper="0.523598776" velocity="0.5" />
+  </joint>
+  <link name="leg02">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/leg02.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="LegWaist-1" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0.122" />
+    <parent link="leg01" />
+    <child link="leg02" />
+    <axis xyz="1 0 0" />
+    <limit effort="100.0" lower="-1.570796327" upper="1.570796327" velocity="0.5" />
+  </joint>
+  <link name="leg03">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/leg03.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="LegWaist-2" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0.285" />
+    <parent link="leg02" />
+    <child link="leg03" />
+    <axis xyz="1 0 0" />
+    <limit effort="100.0" lower="-2.530727415" upper="0.017453293" velocity="0.5" />
+  </joint>
+  <link name="waist01">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/waist01.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="LegWaist-3" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0.318" />
+    <parent link="leg03" />
+    <child link="waist01" />
+    <axis xyz="1 0 0" />
+    <limit effort="100.0" lower="-0.174532925" upper="1.396263402" velocity="0.5" />
+  </joint>
+  <link name="waist02">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/waist02.stl" />
+      </geometry>
+      <material name="moz1_light" />
+    </visual>
+    
+    </link>
+  <joint name="LegWaist-4" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0.12" />
+    <parent link="waist01" />
+    <child link="waist02" />
+    <axis xyz="0 1 0" />
+    <limit effort="100.0" lower="-0.523598776" upper="0.523598776" velocity="0.5" />
+  </joint>
+  <link name="waist03">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/waist03.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="LegWaist-5" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0.1019" />
+    <parent link="waist02" />
+    <child link="waist03" />
+    <axis xyz="0 0 1" />
+    <limit effort="100.0" lower="-3.141592654" upper="3.141592654" velocity="0.5" />
+  </joint>
+  <link name="head21">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/head21.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="Head-0" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.3491" />
+    <parent link="waist03" />
+    <child link="head21" />
+  </joint>
+  <link name="head22">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/head22.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="Head-1" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.103" />
+    <parent link="head21" />
+    <child link="head22" />
+  </joint>
+  <link name="head23">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/head23.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    
+    </link>
+  <joint name="Head-2" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.04" />
+    <parent link="head22" />
+    <child link="head23" />
+  </joint>
+  
+  <link name="neck0_link" />
+  <joint name="Neck-0" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="waist03" />
+    <child link="neck0_link" />
+  </joint>
+  <link name="neck1_link" />
+  <joint name="Neck-1" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="neck0_link" />
+    <child link="neck1_link" />
+  </joint>
+  
+  <link name="torso_link" />
+  <joint name="torso_link_alias_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="waist03" />
+    <child link="torso_link" />
+  </joint>
+  <link name="head_link" />
+  <joint name="head_link_alias_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="head23" />
+    <child link="head_link" />
+  </joint>
+  <link name="left01">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/left01.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="left02">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/left02.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="left03">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/left03.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="left04">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/left04.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="left05">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/left05.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="left06">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/left06.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="left07">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/left07.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  
+  <joint name="LeftArm-0" type="revolute">
+    <origin rpy="0 0 0" xyz="0.1257 0 0.2531" />
+    <parent link="waist03" />
+    <child link="left01" />
+    <axis xyz="1 0 0" />
+    <limit effort="50.0" lower="-3.141592654" upper="2.094395102" velocity="1.0" />
+  </joint>
+  <joint name="LeftArm-1" type="revolute">
+    <origin rpy="0 0 0" xyz="0.079 0 0" />
+    <parent link="left01" />
+    <child link="left02" />
+    <axis xyz="0 1 0" />
+    <limit effort="50.0" lower="-2.967059728" upper="0.157079633" velocity="1.0" />
+  </joint>
+  <joint name="LeftArm-2" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.113" />
+    <parent link="left02" />
+    <child link="left03" />
+    <axis xyz="0 0 1" />
+    <limit effort="50.0" lower="-3.054326191" upper="3.054326191" velocity="1.0" />
+  </joint>
+  
+  <joint name="LeftArm-3" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.187" />
+    <parent link="left03" />
+    <child link="left04" />
+    <axis xyz="1 0 0" />
+    <limit effort="50.0" lower="-2.251474735" upper="0.174532925" velocity="1.0" />
+  </joint>
+  <joint name="LeftArm-4" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.101" />
+    <parent link="left04" />
+    <child link="left05" />
+    <axis xyz="0 0 1" />
+    <limit effort="50.0" lower="-3.054326191" upper="3.054326191" velocity="1.0" />
+  </joint>
+  <joint name="LeftArm-5" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.159" />
+    <parent link="left05" />
+    <child link="left06" />
+    <axis xyz="0 1 0" />
+    <limit effort="50.0" lower="-1.658062789" upper="1.658062789" velocity="1.0" />
+  </joint>
+  <joint name="LeftArm-6" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.0905" />
+    <parent link="left06" />
+    <child link="left07" />
+    <axis xyz="1 0 0" />
+    <limit effort="50.0" lower="-1.570796327" upper="1.570796327" velocity="1.0" />
+  </joint>
+  
+  <link name="left_ee_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.012" />
+      </geometry>
+      <material name="moz1_placeholder" />
+    </visual>
+  </link>
+  <joint name="left_ee_fixed_joint" type="fixed">
+    
+    <origin rpy="0 0 0" xyz="0 0 -0.05" />
+    <parent link="left07" />
+    <child link="left_ee_link" />
+  </joint>
+  <link name="right01">
+    <visual>
+      <origin rpy="0 0 -3.14159265359" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/right01.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="right02">
+    <visual>
+      <origin rpy="0 0 -3.14159265359" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/right02.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="right03">
+    <visual>
+      <origin rpy="0 0 -3.14159265359" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/right03.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="right04">
+    <visual>
+      <origin rpy="0 0 -3.14159265359" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/right04.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="right05">
+    <visual>
+      <origin rpy="0 0 -3.14159265359" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/right05.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="right06">
+    <visual>
+      <origin rpy="0 0 -3.14159265359" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/right06.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <link name="right07">
+    <visual>
+      <origin rpy="0 0 -3.14159265359" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/right07.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  
+  <joint name="RightArm-0" type="revolute">
+    <origin rpy="0 0 3.14159265359" xyz="-0.1257 0 0.2531" />
+    <parent link="waist03" />
+    <child link="right01" />
+    <axis xyz="1 0 0" />
+    <limit effort="50.0" lower="-2.094395102" upper="3.141592654" velocity="1.0" />
+  </joint>
+  <joint name="RightArm-1" type="revolute">
+    <origin rpy="0 0 0" xyz="0.079 0 0" />
+    <parent link="right01" />
+    <child link="right02" />
+    <axis xyz="0 1 0" />
+    <limit effort="50.0" lower="-2.967059728" upper="0.157079633" velocity="1.0" />
+  </joint>
+  <joint name="RightArm-2" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.113" />
+    <parent link="right02" />
+    <child link="right03" />
+    <axis xyz="0 0 1" />
+    <limit effort="50.0" lower="-3.054326191" upper="3.054326191" velocity="1.0" />
+  </joint>
+  
+  <joint name="RightArm-3" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.187" />
+    <parent link="right03" />
+    <child link="right04" />
+    <axis xyz="1 0 0" />
+    <limit effort="50.0" lower="-0.174532925" upper="2.251474735" velocity="1.0" />
+  </joint>
+  <joint name="RightArm-4" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.101" />
+    <parent link="right04" />
+    <child link="right05" />
+    <axis xyz="0 0 1" />
+    <limit effort="50.0" lower="-3.054326191" upper="3.054326191" velocity="1.0" />
+  </joint>
+  <joint name="RightArm-5" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.159" />
+    <parent link="right05" />
+    <child link="right06" />
+    <axis xyz="0 1 0" />
+    <limit effort="50.0" lower="-1.658062789" upper="1.658062789" velocity="1.0" />
+  </joint>
+  <joint name="RightArm-6" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 -0.0905" />
+    <parent link="right06" />
+    <child link="right07" />
+    <axis xyz="1 0 0" />
+    <limit effort="50.0" lower="-1.570796327" upper="1.570796327" velocity="1.0" />
+  </joint>
+  
+  <link name="right_ee_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.012" />
+      </geometry>
+      <material name="moz1_placeholder" />
+    </visual>
+  </link>
+  <joint name="right_ee_fixed_joint" type="fixed">
+    
+    <origin rpy="0 0 0" xyz="0 0 -0.05" />
+    <parent link="right07" />
+    <child link="right_ee_link" />
+  </joint>
+  
+  <link name="left_gripper_base_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_base.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_gripper_mount_joint" type="fixed">
+    <origin rpy="0 3.141592653589793 0" xyz="-0.0101 0.0 0.0005" />
+    <parent link="left_ee_link" />
+    <child link="left_gripper_base_link" />
+  </joint>
+  
+  <link name="left_gripper_actuator_link" />
+  <joint name="left_gripper_joint" type="prismatic">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_actuator_link" />
+    <axis xyz="0 0 1" />
+    <limit effort="20.0" lower="0.0" upper="0.12" velocity="0.1" />
+  </joint>
+  
+  <link name="left_gripper_narrow1_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_narrow1.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_gripper_narrow1_joint" type="revolute">
+    <origin rpy="-2.9951 -1.5708 -0.15964" xyz="0 -0.0195 0.0565" />
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_narrow1_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.805398163" upper="0.050752701" velocity="1.0" />
+    <mimic joint="left_gripper_joint" multiplier="-6.801257207" offset="0.030752701" />
+  </joint>
+  
+  <link name="left_gripper_narrow2_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_narrow2.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_gripper_narrow2_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.030852 0.018551 0" />
+    <parent link="left_gripper_narrow1_link" />
+    <child link="left_gripper_narrow2_link" />
+  </joint>
+  
+  <link name="left_gripper_narrow3_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_narrow3.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_gripper_narrow3_joint" type="revolute">
+    <origin rpy="0 0 0" xyz="0.018118 -0.01574 0" />
+    <parent link="left_gripper_narrow2_link" />
+    <child link="left_gripper_narrow3_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.100517101" upper="0.138972841" velocity="1.0" />
+    <mimic joint="left_gripper_joint" multiplier="1.662416185" offset="-0.080517101" />
+  </joint>
+  
+  <link name="left_gripper_narrow4_link" />
+  <joint name="left_gripper_narrow4_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 -0.0104 0" />
+    <parent link="left_gripper_narrow3_link" />
+    <child link="left_gripper_narrow4_link" />
+  </joint>
+  <link name="left_gripper_narrow_loop_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_narrow_loop.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_gripper_narrow_loop_joint" type="revolute">
+    <origin rpy="-2.9951 -1.5708 -0.15964" xyz="0 -0.021633 0.07387" />
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_narrow_loop_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-1.213484588" upper="0.062258886" velocity="1.0" />
+    <mimic joint="left_gripper_joint" multiplier="-10.297862281" offset="0.042258886" />
+  </joint>
+  
+  <link name="left_gripper_wide1_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_wide1.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_gripper_wide1_joint" type="revolute">
+    <origin rpy="-2.9951 -1.5708 -0.15964" xyz="0 0.0195 0.0565" />
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_wide1_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.050752701" upper="0.805398163" velocity="1.0" />
+    <mimic joint="left_gripper_joint" multiplier="6.801257207" offset="-0.030752701" />
+  </joint>
+  
+  <link name="left_gripper_wide2_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_wide2.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_gripper_wide2_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.030852 -0.018551 0" />
+    <parent link="left_gripper_wide1_link" />
+    <child link="left_gripper_wide2_link" />
+  </joint>
+  
+  <link name="left_gripper_wide3_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_wide3.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_gripper_wide3_joint" type="revolute">
+    <origin rpy="0 0 0" xyz="0.018118 0.01574 0" />
+    <parent link="left_gripper_wide2_link" />
+    <child link="left_gripper_wide3_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.138972841" upper="0.100517101" velocity="1.0" />
+    <mimic joint="left_gripper_joint" multiplier="-1.662416185" offset="0.080517101" />
+  </joint>
+  
+  <link name="left_gripper_wide4_link" />
+  <joint name="left_gripper_wide4_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0.0104 0" />
+    <parent link="left_gripper_wide3_link" />
+    <child link="left_gripper_wide4_link" />
+  </joint>
+  <link name="left_gripper_wide_loop_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_wide_loop.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_gripper_wide_loop_joint" type="revolute">
+    <origin rpy="-2.9951 -1.5708 -0.15964" xyz="0 0.021633 0.07387" />
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_wide_loop_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.062258886" upper="1.213484588" velocity="1.0" />
+    <mimic joint="left_gripper_joint" multiplier="10.297862281" offset="-0.042258886" />
+  </joint>
+  
+  <link name="left_gripper_tcp_link" />
+  <joint name="left_gripper_tcp_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.139807" />
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_tcp_link" />
+  </joint>
+  
+  <link name="right_gripper_base_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_base.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_gripper_mount_joint" type="fixed">
+    <origin rpy="0 3.141592653589793 0" xyz="-0.0101 0.0 0.0005" />
+    <parent link="right_ee_link" />
+    <child link="right_gripper_base_link" />
+  </joint>
+  
+  <link name="right_gripper_actuator_link" />
+  <joint name="right_gripper_joint" type="prismatic">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_actuator_link" />
+    <axis xyz="0 0 1" />
+    <limit effort="20.0" lower="0.0" upper="0.12" velocity="0.1" />
+  </joint>
+  
+  <link name="right_gripper_narrow1_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_narrow1.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_gripper_narrow1_joint" type="revolute">
+    <origin rpy="-2.9951 -1.5708 -0.15964" xyz="0 -0.0195 0.0565" />
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_narrow1_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.805398163" upper="0.050752701" velocity="1.0" />
+    <mimic joint="right_gripper_joint" multiplier="-6.801257207" offset="0.030752701" />
+  </joint>
+  
+  <link name="right_gripper_narrow2_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_narrow2.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_gripper_narrow2_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.030852 0.018551 0" />
+    <parent link="right_gripper_narrow1_link" />
+    <child link="right_gripper_narrow2_link" />
+  </joint>
+  
+  <link name="right_gripper_narrow3_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_narrow3.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_gripper_narrow3_joint" type="revolute">
+    <origin rpy="0 0 0" xyz="0.018118 -0.01574 0" />
+    <parent link="right_gripper_narrow2_link" />
+    <child link="right_gripper_narrow3_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.100517101" upper="0.138972841" velocity="1.0" />
+    <mimic joint="right_gripper_joint" multiplier="1.662416185" offset="-0.080517101" />
+  </joint>
+  
+  <link name="right_gripper_narrow4_link" />
+  <joint name="right_gripper_narrow4_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 -0.0104 0" />
+    <parent link="right_gripper_narrow3_link" />
+    <child link="right_gripper_narrow4_link" />
+  </joint>
+  <link name="right_gripper_narrow_loop_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_narrow_loop.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_gripper_narrow_loop_joint" type="revolute">
+    <origin rpy="-2.9951 -1.5708 -0.15964" xyz="0 -0.021633 0.07387" />
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_narrow_loop_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-1.213484588" upper="0.062258886" velocity="1.0" />
+    <mimic joint="right_gripper_joint" multiplier="-10.297862281" offset="0.042258886" />
+  </joint>
+  
+  <link name="right_gripper_wide1_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_wide1.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_gripper_wide1_joint" type="revolute">
+    <origin rpy="-2.9951 -1.5708 -0.15964" xyz="0 0.0195 0.0565" />
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_wide1_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.050752701" upper="0.805398163" velocity="1.0" />
+    <mimic joint="right_gripper_joint" multiplier="6.801257207" offset="-0.030752701" />
+  </joint>
+  
+  <link name="right_gripper_wide2_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_wide2.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_gripper_wide2_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.030852 -0.018551 0" />
+    <parent link="right_gripper_wide1_link" />
+    <child link="right_gripper_wide2_link" />
+  </joint>
+  
+  <link name="right_gripper_wide3_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_wide3.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_gripper_wide3_joint" type="revolute">
+    <origin rpy="0 0 0" xyz="0.018118 0.01574 0" />
+    <parent link="right_gripper_wide2_link" />
+    <child link="right_gripper_wide3_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.138972841" upper="0.100517101" velocity="1.0" />
+    <mimic joint="right_gripper_joint" multiplier="-1.662416185" offset="0.080517101" />
+  </joint>
+  
+  <link name="right_gripper_wide4_link" />
+  <joint name="right_gripper_wide4_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0.0104 0" />
+    <parent link="right_gripper_wide3_link" />
+    <child link="right_gripper_wide4_link" />
+  </joint>
+  <link name="right_gripper_wide_loop_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/gripper_wide_loop.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_gripper_wide_loop_joint" type="revolute">
+    <origin rpy="-2.9951 -1.5708 -0.15964" xyz="0 0.021633 0.07387" />
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_wide_loop_link" />
+    <axis xyz="0 0 -1" />
+    <limit effort="20.0" lower="-0.062258886" upper="1.213484588" velocity="1.0" />
+    <mimic joint="right_gripper_joint" multiplier="10.297862281" offset="-0.042258886" />
+  </joint>
+  
+  <link name="right_gripper_tcp_link" />
+  <joint name="right_gripper_tcp_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.139807" />
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_tcp_link" />
+  </joint>
+  
+  
+  <link name="left_wrist_camera_mount_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/wrist_camera_mount.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="left_wrist_camera_mount_joint" type="fixed">
+    <origin rpy="3.141592653589793 0 -1.5707963267948966" xyz="0 0 0.0144" />
+    <parent link="left_gripper_base_link" />
+    <child link="left_wrist_camera_mount_link" />
+  </joint>
+  
+  
+  <link name="left_wrist_camera_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0.00552 0.02303 -0.040" />
+      <geometry>
+        <mesh filename="meshes/wrist_camera_d405.stl" />
+      </geometry>
+      <material name="moz1_sensor" />
+    </visual>
+    </link>
+  <joint name="left_wrist_camera_joint" type="fixed">
+    <origin rpy="-2.0943951023931953 0 0" xyz="0 0.072424 -0.010754" />
+    <parent link="left_wrist_camera_mount_link" />
+    <child link="left_wrist_camera_link" />
+  </joint>
+  
+  <link name="left_wrist_camera_optical_frame" />
+  <joint name="left_wrist_camera_optical_joint" type="fixed">
+    <origin rpy="-1.5707963267948966 0 0" xyz="0 0.02296 0" />
+    <parent link="left_wrist_camera_link" />
+    <child link="left_wrist_camera_optical_frame" />
+  </joint>
+  
+  <link name="cam_left_wrist_color_optical_frame" />
+  <joint name="cam_left_wrist_color_optical_joint" type="fixed">
+    <origin rpy="-1.4835313267948966 0 0" xyz="-0.007 0.02096 -0.005" />
+    <parent link="left_wrist_camera_link" />
+    <child link="cam_left_wrist_color_optical_frame" />
+  </joint>
+  
+  
+  <link name="right_wrist_camera_mount_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/wrist_camera_mount.stl" />
+      </geometry>
+      <material name="moz1_grey" />
+    </visual>
+    </link>
+  <joint name="right_wrist_camera_mount_joint" type="fixed">
+    <origin rpy="3.141592653589793 0 -1.5707963267948966" xyz="0 0 0.0144" />
+    <parent link="right_gripper_base_link" />
+    <child link="right_wrist_camera_mount_link" />
+  </joint>
+  
+  
+  <link name="right_wrist_camera_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0.00552 0.02303 -0.040" />
+      <geometry>
+        <mesh filename="meshes/wrist_camera_d405.stl" />
+      </geometry>
+      <material name="moz1_sensor" />
+    </visual>
+    </link>
+  <joint name="right_wrist_camera_joint" type="fixed">
+    <origin rpy="-2.0943951023931953 0 0" xyz="0 0.072424 -0.010754" />
+    <parent link="right_wrist_camera_mount_link" />
+    <child link="right_wrist_camera_link" />
+  </joint>
+  
+  <link name="right_wrist_camera_optical_frame" />
+  <joint name="right_wrist_camera_optical_joint" type="fixed">
+    <origin rpy="-1.5707963267948966 0 0" xyz="0 0.02296 0" />
+    <parent link="right_wrist_camera_link" />
+    <child link="right_wrist_camera_optical_frame" />
+  </joint>
+  
+  <link name="cam_right_wrist_color_optical_frame" />
+  <joint name="cam_right_wrist_color_optical_joint" type="fixed">
+    <origin rpy="-1.4835313267948966 0 0" xyz="-0.007 0.02096 -0.005" />
+    <parent link="right_wrist_camera_link" />
+    <child link="cam_right_wrist_color_optical_frame" />
+  </joint>
+  <link name="head_camera_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.03 0.03 0.03" />
+      </geometry>
+      <material name="moz1_sensor" />
+    </visual>
+  </link>
+  <joint name="head_camera_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.05 0 0.02" />
+    <parent link="head23" />
+    <child link="head_camera_link" />
+  </joint>
+  
+  <link name="cam_high_color_optical_frame" />
+  <joint name="cam_high_color_optical_joint" type="fixed">
+    <origin rpy="-1.5707963267948966 0 3.141592653589793" xyz="0 0 0" />
+    <parent link="head_camera_link" />
+    <child link="cam_high_color_optical_frame" />
+  </joint>
+  <link name="torso_camera_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.03 0.03 0.03" />
+      </geometry>
+      <material name="moz1_sensor" />
+    </visual>
+  </link>
+  <joint name="torso_camera_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.08 0 0.1" />
+    <parent link="waist03" />
+    <child link="torso_camera_link" />
+  </joint>
+  
+  <link name="ee_origin_link" />
+  <joint name="ee_origin_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.2531" />
+    <parent link="waist03" />
+    <child link="ee_origin_link" />
+  </joint>
+  
+  <link name="cam_high_optical_frame" />
+  <joint name="cam_high_optical_joint" type="fixed">
+    <parent link="head_camera_link" />
+    <child link="cam_high_optical_frame" />
+    <origin rpy="-1.5707963 0 -1.5707963" xyz="0 0 0" />
+  </joint>
+  <link name="livox_frame">
+    </link>
+  <joint name="livox_frame_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.30" />
+    <parent link="base_link" />
+    <child link="livox_frame" />
+  </joint>
+  
+  </robot>

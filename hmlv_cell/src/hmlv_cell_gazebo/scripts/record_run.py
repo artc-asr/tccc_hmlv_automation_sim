@@ -15,6 +15,14 @@ or "failed" (or after max_duration s, or on Ctrl-C) and writes to `out_dir`:
     world.sdf        a copy of world_file (the static scene)
 
 tools/web_replay/build.py turns that into the page's data.
+
+Two robots (duo.launch.py record:=...): with `robots` (e.g. ["g1", "moz1"]) each
+robot's joints, base and description come from its namespace (/<ns>/joint_states,
+/<ns>/tf, /<ns>/robot_description), its steps from /<ns>/transfer_demo/phase (as
+"<ns>:<step>"), the line's from /duo/phase — which alone ends the recording — and
+its log lines from <ns>.duo_demo and duo_supervisor. recording.json then has a
+"robots" section ({ns: {joint_names, joints, base}}) and robot_<ns>.urdf is written
+per robot.
 """
 import json
 import os
@@ -48,6 +56,7 @@ class RunRecorder(Node):
         self.tail = self.declare_parameter("tail", 3.0).value
         self.max_duration = self.declare_parameter("max_duration", 1200.0).value
         self.can_prefix = self.declare_parameter("can_prefix", "jerrycan_").value
+        self.duo = [r for r in self.declare_parameter("robots", [""]).value if r]
 
         self.joints = {}            # name -> position (latest)
         self.base = None            # latest base_link pose
@@ -59,10 +68,31 @@ class RunRecorder(Node):
         self.rec = {"rate": rate, "joint_names": [], "t": [], "base": [], "joints": [],
                     "cans": {}, "phases": [], "logs": [], "recolors": []}
 
-        self.create_subscription(JointState, "/joint_states", self._on_joints, 50)
-        self.create_subscription(TFMessage, "/tf", self._on_tf, 100)
-        self.create_subscription(String, "/robot_description", self._on_urdf, LATCHED)
-        self.create_subscription(String, "/transfer_demo/phase", self._on_phase, LATCHED)
+        if self.duo:
+            self.per = {r: {"joints": {}, "base": None, "urdf": None} for r in self.duo}
+            self.rec["robots"] = {r: {"joint_names": [], "joints": [], "base": []}
+                                  for r in self.duo}
+            for r in self.duo:
+                st = self.per[r]
+                self.create_subscription(JointState, f"/{r}/joint_states",
+                                         lambda m, st=st: st["joints"].update(
+                                             zip(m.name, m.position)), 50)
+                self.create_subscription(TFMessage, f"/{r}/tf",
+                                         lambda m, st=st: self._on_base_tf(st, m), 100)
+                self.create_subscription(String, f"/{r}/robot_description",
+                                         lambda m, st=st: st.update(urdf=m.data), LATCHED)
+                self.create_subscription(String, f"/{r}/transfer_demo/phase",
+                                         lambda m, r=r: self._on_robot_phase(r, m), LATCHED)
+            self.create_subscription(TFMessage, "/tf", self._on_tf, 100)   # the cans
+            self.create_subscription(String, "/duo/phase", self._on_phase, LATCHED)
+            self.log_names = {f"{r}.duo_demo": f"[{r}] " for r in self.duo}
+            self.log_names["duo_supervisor"] = ""
+        else:
+            self.create_subscription(JointState, "/joint_states", self._on_joints, 50)
+            self.create_subscription(TFMessage, "/tf", self._on_tf, 100)
+            self.create_subscription(String, "/robot_description", self._on_urdf, LATCHED)
+            self.create_subscription(String, "/transfer_demo/phase", self._on_phase, LATCHED)
+            self.log_names = {"transfer_demo": ""}
         self.create_subscription(String, "/scene_markers/recolor", self._on_recolor, 10)
         self.create_subscription(Log, "/rosout", self._on_log, 100)
         self.create_timer(1.0 / rate, self._sample)
@@ -85,6 +115,14 @@ class RunRecorder(Node):
             elif child.startswith(self.can_prefix):
                 self.cans[child] = _pose(tf)
 
+    def _on_base_tf(self, st, msg):
+        for tf in msg.transforms:
+            if tf.child_frame_id == "base_link":
+                st["base"] = _pose(tf)
+
+    def _on_robot_phase(self, robot, msg):
+        self.rec["phases"].append({"t": self._rel(self._now()), "phase": f"{robot}:{msg.data}"})
+
     def _on_urdf(self, msg):
         self.urdf = msg.data
 
@@ -100,17 +138,25 @@ class RunRecorder(Node):
                                      "rgba": [float(v) for v in rgba]})
 
     def _on_log(self, msg):
-        if msg.name != "transfer_demo":
+        if msg.name not in self.log_names:
             return
         # at receipt, in sim time: /rosout stamps are wall-clock time
         self.rec["logs"].append({"t": self._rel(self._now()), "level": int(msg.level),
-                                 "msg": msg.msg})
-        if msg.level >= ERROR and msg.msg.startswith("stopped:") and self.end_at is None:
+                                 "msg": self.log_names[msg.name] + msg.msg})
+        if msg.level >= ERROR and msg.msg.startswith("stopped:") and self.end_at is None \
+                and msg.name in ("transfer_demo", "duo_supervisor"):
             self.end_at = self._now() + self.tail
 
     def _sample(self):
         now = self._now()
-        if now <= 0.0 or self.base is None or not self.joints:
+        if self.duo:
+            if now <= 0.0 or any(st["base"] is None or not st["joints"]
+                                 for st in self.per.values()):
+                return                              # no /clock or a robot not up yet
+            if self.t0 is None:
+                for r, st in self.per.items():
+                    self.rec["robots"][r]["joint_names"] = sorted(st["joints"])
+        elif now <= 0.0 or self.base is None or not self.joints:
             return                                  # no /clock or no robot yet
         if self.t0 is None:
             self.t0 = now
@@ -119,8 +165,15 @@ class RunRecorder(Node):
                                    f"{len(self.cans)} cans")
         r = self.rec
         r["t"].append(self._rel(now))
-        r["base"].append(self.base)
-        r["joints"].append([round(self.joints.get(n, 0.0), 4) for n in r["joint_names"]])
+        if self.duo:
+            for name, st in self.per.items():
+                rr = r["robots"][name]
+                rr["base"].append(st["base"])
+                rr["joints"].append([round(st["joints"].get(n, 0.0), 4)
+                                     for n in rr["joint_names"]])
+        else:
+            r["base"].append(self.base)
+            r["joints"].append([round(self.joints.get(n, 0.0), 4) for n in r["joint_names"]])
         n = len(r["t"])
         for name, pose in self.cans.items():
             # a can first seen late is back-filled with its first pose
@@ -138,7 +191,15 @@ class RunRecorder(Node):
         self.rec["robot"] = self.robot
         with open(os.path.join(self.out_dir, "recording.json"), "w") as f:
             json.dump(self.rec, f, separators=(",", ":"))
-        if self.urdf:
+        if self.duo:
+            for r, st in self.per.items():
+                if st["urdf"]:
+                    with open(os.path.join(self.out_dir, f"robot_{r}.urdf"), "w") as f:
+                        f.write(st["urdf"])
+                else:
+                    self.get_logger().warn(f"no /{r}/robot_description: robot_{r}.urdf not "
+                                           f"written")
+        elif self.urdf:
             with open(os.path.join(self.out_dir, "robot.urdf"), "w") as f:
                 f.write(self.urdf)
         else:

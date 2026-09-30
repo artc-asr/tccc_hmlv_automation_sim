@@ -1,0 +1,748 @@
+<robot name="galbot_g1">
+  <joint name="leg_joint" type="fixed">
+    <parent link="omni_chassis_leg_mount_link" />
+    <child link="leg_base_link" />
+  </joint>
+  <link name="leg_base_link">
+    </link>
+  <link name="leg_link1">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/leg1.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="leg_joint1" type="revolute">
+    <origin rpy="1.5707963267948966 -0.385 3.141592653589793" xyz="0 0 0" />
+    <parent link="leg_base_link" />
+    <child link="leg_link1" />
+    <axis xyz="0 0 1" />
+    <limit effort="420" lower="0.0" upper="0.9374" velocity="1" />
+  </joint>
+  <link name="leg_link2">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/leg2.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="leg_joint2" type="revolute">
+    <origin rpy="3.141592653589793 0 2.7566" xyz="0.45 0 0" />
+    <parent link="leg_link1" />
+    <child link="leg_link2" />
+    <axis xyz="0 0 1" />
+    <limit effort="420" lower="0.0" upper="2.5847" velocity="1" />
+  </joint>
+  <link name="leg_link3">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/leg3.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="leg_joint3" type="revolute">
+    <origin rpy="3.141592653589793 0 3.141592653589793" xyz="0.39 0 0" />
+    <parent link="leg_link2" />
+    <child link="leg_link3" />
+    <axis xyz="0 0 1" />
+    <limit effort="280" lower="0.0" upper="2.3262" velocity="1" />
+  </joint>
+  <link name="leg_link4">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/leg4.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="leg_joint4" type="revolute">
+    <origin rpy="-1.5707963267948966 -1.5707963267948966 0" xyz="0 0.224 0" />
+    <parent link="leg_link3" />
+    <child link="leg_link4" />
+    <axis xyz="0 0 1" />
+    <limit effort="200" lower="-1.5906" upper="1.5906" velocity="1" />
+  </joint>
+  <link name="leg_link5">
+    </link>
+  <joint name="leg_joint5" type="revolute">
+    <origin rpy="1.5707963267948966 0 0" xyz="0 0 0" />
+    <parent link="leg_link4" />
+    <child link="leg_link5" />
+    <axis xyz="0 0 1" />
+    <limit effort="100" lower="-0.1645" upper="0.1645" velocity="1" />
+  </joint>
+  <link name="leg_end_effector_mount_link" />
+  <joint name="leg_end_effector_mount_joint" type="fixed">
+    <parent link="leg_link5" />
+    <child link="leg_end_effector_mount_link" />
+  </joint>
+  <joint name="torso_joint" type="fixed">
+    <parent link="leg_end_effector_mount_link" />
+    <child link="torso_base_link" />
+  </joint>
+  <link name="torso_base_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/torso.stl" />
+      </geometry>
+    </visual>
+    </link>
+  
+  <link name="base_link" />
+  <link name="base_footprint" />
+  <joint name="base_footprint_joint" type="fixed">
+    <origin xyz="0 0 -0.028166" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="base_footprint" />
+  </joint>
+  <joint name="omni_chassis_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="omni_chassis_base_link" />
+  </joint>
+  <link name="omni_chassis_base_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/chassis.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="omni_chassis_leg_mount_link" />
+  <joint name="omni_chassis_leg_mount_joint" type="fixed">
+    <origin xyz="0.134 0 0.1325" rpy="0 0 0" />
+    <parent link="omni_chassis_base_link" />
+    <child link="omni_chassis_leg_mount_link" />
+  </joint>
+  
+  <link name="wheel_1">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/omniwheel_10.stl" />
+      </geometry>
+    </visual>
+    </link>
+  
+  <link name="wheel_2">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/omniwheel_10.stl" />
+      </geometry>
+    </visual>
+    </link>
+  
+  <link name="wheel_3">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/omniwheel_10.stl" />
+      </geometry>
+    </visual>
+    </link>
+  
+  <link name="wheel_4">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/omniwheel_10.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="wheel1_joint" type="fixed">
+    <origin rpy="0 0 -2.356194490192345" xyz="0.176493 0.176493 0.071834" />
+    <parent link="omni_chassis_base_link" />
+    <child link="wheel_1" />
+  </joint>
+  <joint name="wheel2_joint" type="fixed">
+    <origin rpy="0 0 -0.7853981633974483" xyz="-0.176493 0.176493 0.071834" />
+    <parent link="omni_chassis_base_link" />
+    <child link="wheel_2" />
+  </joint>
+  <joint name="wheel3_joint" type="fixed">
+    <origin rpy="0 0 0.7853981633974483" xyz="-0.176493 -0.176493 0.071834" />
+    <parent link="omni_chassis_base_link" />
+    <child link="wheel_3" />
+  </joint>
+  <joint name="wheel4_joint" type="fixed">
+    <origin rpy="0 0 2.356194490192345" xyz="0.176493 -0.176493 0.071834" />
+    <parent link="omni_chassis_base_link" />
+    <child link="wheel_4" />
+  </joint>
+  <link name="chassis_lidar">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/mid360.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="chassis_lidar_joint" type="fixed">
+    <parent link="omni_chassis_base_link" />
+    <child link="chassis_lidar" />
+    <origin xyz="0.235 0 0.2144" rpy="0 0 0" />
+  </joint>
+  <link name="torso_head_mount_link" />
+  <joint name="torso_head_mount_joint" type="fixed">
+    <origin rpy="-1.5707963267948966 -1.5707963267948966 0" xyz="0 0.37711 0" />
+    <parent link="torso_base_link" />
+    <child link="torso_head_mount_link" />
+    <axis xyz="1 0 0" />
+  </joint>
+  <joint name="head_joint" type="fixed">
+    <parent link="torso_head_mount_link" />
+    <child link="head_base_link" />
+  </joint>
+  <link name="head_base_link">
+    </link>
+  <link name="head_link1">
+    </link>
+  <joint name="head_joint1" type="revolute">
+    <parent link="head_base_link" />
+    <child link="head_link1" />
+    <axis xyz="0 0 1" />
+    <limit effort="10" lower="-1.5208" upper="1.5208" velocity="1.5" />
+  </joint>
+  <link name="head_link2">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="meshes/head_link2.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="head_joint2" type="revolute">
+    <origin rpy="-1.5707963267948966 0 0" xyz="0 0 0" />
+    <parent link="head_link1" />
+    <child link="head_link2" />
+    <axis xyz="0 0 1" />
+    <limit effort="10" lower="-0.2143461" upper="0.4935988" velocity="1.5" />
+  </joint>
+  <link name="head_end_effector_mount_link" />
+  <joint name="head_end_effector_mount_joint" type="fixed">
+    <parent link="head_link2" />
+    <child link="head_end_effector_mount_link" />
+    <axis xyz="1 0 0" />
+  </joint>
+  
+  <link name="torso_left_arm_mount_link" />
+  <joint name="torso_left_arm_mount_joint" type="fixed">
+    <origin rpy="0 1.5707963267948966 0" xyz="0.20843 0.172 0" />
+    <parent link="torso_base_link" />
+    <child link="torso_left_arm_mount_link" />
+    <axis xyz="1 0 0" />
+  </joint>
+  
+  <link name="torso_right_arm_mount_link" />
+  <joint name="torso_right_arm_mount_joint" type="fixed">
+    <origin rpy="3.141592653589793 1.5707963267948966 0" xyz="-0.20843 0.172 0" />
+    <parent link="torso_base_link" />
+    <child link="torso_right_arm_mount_link" />
+    <axis xyz="1 0 0" />
+  </joint>
+  <joint name="right_arm_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="torso_right_arm_mount_link" />
+    <child link="right_arm_base_link" />
+  </joint>
+  <link name="right_arm_base_link">
+    </link>
+  <link name="right_arm_link1">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link1_right.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="right_arm_joint1" type="revolute">
+    <origin rpy="0 0 -0.523598775598286" xyz="0 0 0" />
+    <parent link="right_arm_base_link" />
+    <child link="right_arm_link1" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="180" jerk="12" lower="-3.00432619" upper="3.00432619" velocity="1.5" />
+  </joint>
+  <link name="right_arm_link2">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link2_right.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="right_arm_joint2" type="revolute">
+    <origin rpy="-1.5707963267949 0 3.14159265358979" xyz="0 0 0" />
+    <parent link="right_arm_link1" />
+    <child link="right_arm_link2" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="180" jerk="12" lower="-1.608062789" upper="1.608062789" velocity="1.5" />
+  </joint>
+  <link name="right_arm_link3">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link3_right.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="right_arm_joint3" type="revolute">
+    <origin rpy="-1.5707963267949 1.04719755119629 -3.14159265358979" xyz="0 -0.35 0" />
+    <parent link="right_arm_link2" />
+    <child link="right_arm_link3" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="60" jerk="12" lower="-2.916972222" upper="2.916972222" velocity="1.5" />
+  </joint>
+  <link name="right_arm_link4">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link4_right.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="right_arm_joint4" type="revolute">
+    <origin rpy="-1.57079632679459 0 3.14159265358979" xyz="0 0 0" />
+    <parent link="right_arm_link3" />
+    <child link="right_arm_link4" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="60" jerk="12" lower="-1.869862177" upper="2.5679938779914946" velocity="1.5" />
+  </joint>
+  <link name="right_arm_link5">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link5_right.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="right_arm_joint5" type="revolute">
+    <origin rpy="-1.5707963267949 0 3.1415926535898" xyz="0 -0.36 0" />
+    <parent link="right_arm_link4" />
+    <child link="right_arm_link5" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="30" jerk="12" lower="-2.916972222" upper="2.916972222" velocity="1.5" />
+  </joint>
+  <link name="right_arm_link6">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link6_right.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="right_arm_joint6" type="revolute">
+    <origin rpy="1.5707963267949 1.5707963267949 0" xyz="0 0 0" />
+    <parent link="right_arm_link5" />
+    <child link="right_arm_link6" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="30" jerk="12" lower="-0.7353981633974483" upper="0.8226646259971648" velocity="1.5" />
+  </joint>
+  <link name="right_arm_link7">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link7_right.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="right_arm_joint7" type="revolute">
+    <origin rpy="-1.5707963267949 0 0" xyz="0 0 0" />
+    <parent link="right_arm_link6" />
+    <child link="right_arm_link7" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="30" jerk="12" lower="-1.538202778" upper="1.538202778" velocity="1.5" />
+  </joint>
+  <link name="right_arm_end_effector_mount_link">
+    </link>
+  <joint name="right_arm_end_effector_mount_joint" type="fixed">
+    <origin rpy="3.141592653589793 0 3.141592653589793" xyz="-0.10926 0 0" />
+    <parent link="right_arm_link7" />
+    <child link="right_arm_end_effector_mount_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+  <joint name="right_arm_camera_stand_joint" type="fixed">
+    <parent link="right_arm_link7" />
+    <child link="right_arm_wrist_camera_stand" />
+  </joint>
+  <link name="right_arm_wrist_camera_stand">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/d405_stand_right.stl" />
+      </geometry>
+    </visual>
+  </link>
+  <joint name="right_arm_camera_joint" type="fixed">
+    <origin rpy="0 1.4807963267948965 3.141592653589793" xyz="-0.0822 0 -0.06842" />
+    <parent link="right_arm_wrist_camera_stand" />
+    <child link="right_wrist_camera_link" />
+  </joint>
+  <link name="right_wrist_camera_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/d405.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="right_gripper_mount_joint" type="fixed">
+    <origin rpy="1.5707963267948966 0 0" xyz="0 0 0" />
+    <parent link="right_arm_end_effector_mount_link" />
+    <child link="right_gripper_flange_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+  <link name="right_gripper_flange_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/flange.stl" />
+      </geometry>
+    </visual>
+  </link>
+  <joint name="right_gripper_base_joint" type="fixed">
+    <origin xyz="0.0065 0 0" rpy="0 0 0" />
+    <parent link="right_gripper_flange_link" />
+    <child link="right_gripper_base_link" />
+  </joint>
+  <link name="right_gripper_base_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/base_link.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="right_gripper_l_knuckle_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link1.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="right_gripper_l_inner_knuckle_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link2.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="right_gripper_l_finger_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link3.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="right_gripper_r_knuckle_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link1.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="right_gripper_r_inner_knuckle_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link2.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="right_gripper_r_finger_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link3_right_2.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="right_gripper_joint" type="revolute">
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_r_knuckle_link" />
+    <origin rpy="1.5707963267948966 -1.2465 0" xyz="0.0745 0 0.0385" />
+    <axis xyz="0 0 -1" />
+    <limit effort="50.0" lower="0.0" upper="1.703" velocity="0.5" />
+  </joint>
+  <joint name="right_gripper_r_inner_knuckle_joint" type="revolute">
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_r_inner_knuckle_link" />
+    <origin rpy="1.5707963267948966 -1.2465 0" xyz="0.079 0 0.026" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" lower="-3.13" upper="3.13" velocity="2.0" />
+    <mimic joint="right_gripper_joint" multiplier="-1" />
+  </joint>
+  <joint name="right_gripper_r_finger_joint" type="revolute">
+    <parent link="right_gripper_r_inner_knuckle_link" />
+    <child link="right_gripper_r_finger_link" />
+    <origin rpy="0 0 -1.2465" xyz="0.045 0 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" lower="-3.13" upper="3.13" velocity="2.0" />
+    <mimic joint="right_gripper_joint" multiplier="1" />
+  </joint>
+  <joint name="right_gripper_l_knuckle_joint" type="revolute">
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_l_knuckle_link" />
+    <origin rpy="1.5707963267948966 1.2465 0" xyz="0.0745 0 -0.0385" />
+    <axis xyz="0 0 1" />
+    <limit effort="50" lower="-3.13" upper="3.13" velocity="0.5" />
+    <mimic joint="right_gripper_joint" multiplier="1" />
+  </joint>
+  <joint name="right_gripper_l_inner_knuckle_joint" type="revolute">
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_l_inner_knuckle_link" />
+    <origin rpy="1.5707963267948966 1.2465 0" xyz="0.079 0 -0.026" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" lower="-3.13" upper="3.13" velocity="2.0" />
+    <mimic joint="right_gripper_joint" multiplier="1" />
+  </joint>
+  <joint name="right_gripper_l_finger_joint" type="revolute">
+    <parent link="right_gripper_l_inner_knuckle_link" />
+    <child link="right_gripper_l_finger_link" />
+    <origin rpy="0 0 1.2465" xyz="0.045 0 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" lower="-3.13" upper="3.13" velocity="2.0" />
+    <mimic joint="right_gripper_joint" multiplier="-1" />
+  </joint>
+  <link name="right_gripper_tcp_link" />
+  <joint name="right_gripper_tcp_joint" type="fixed">
+    <parent link="right_gripper_base_link" />
+    <child link="right_gripper_tcp_link" />
+    <origin rpy="-1.5707963267948966 0 0" xyz="0.13996 0 0" />
+  </joint>
+  <joint name="left_arm_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="torso_left_arm_mount_link" />
+    <child link="left_arm_base_link" />
+  </joint>
+  <link name="left_arm_base_link">
+    </link>
+  <link name="left_arm_link1">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link1_left.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="left_arm_joint1" type="revolute">
+    <origin rpy="0 0 0.523598775598286" xyz="0 0 0" />
+    <parent link="left_arm_base_link" />
+    <child link="left_arm_link1" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="180" jerk="12" lower="-3.00432619" upper="3.00432619" velocity="1.5" />
+  </joint>
+  <link name="left_arm_link2">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link2_left.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="left_arm_joint2" type="revolute">
+    <origin rpy="1.5707963267949 0 3.14159265358979" xyz="0 0 0" />
+    <parent link="left_arm_link1" />
+    <child link="left_arm_link2" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="180" jerk="12" lower="-1.608062789" upper="1.608062789" velocity="1.5" />
+  </joint>
+  <link name="left_arm_link3">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link3_left.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="left_arm_joint3" type="revolute">
+    <origin rpy="1.5707963267949 1.04719755119629 -3.14159265358979" xyz="0 0.35 0" />
+    <parent link="left_arm_link2" />
+    <child link="left_arm_link3" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="60" jerk="12" lower="-2.916972222" upper="2.916972222" velocity="1.5" />
+  </joint>
+  <link name="left_arm_link4">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link4_left.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="left_arm_joint4" type="revolute">
+    <origin rpy="1.57079632679459 0 3.14159265358979" xyz="0 0 0" />
+    <parent link="left_arm_link3" />
+    <child link="left_arm_link4" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="60" jerk="12" lower="-2.5679938779914946" upper="1.869862177" velocity="1.5" />
+  </joint>
+  <link name="left_arm_link5">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link5_left.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="left_arm_joint5" type="revolute">
+    <origin rpy="-1.5707963267949 0 0.0" xyz="0 0.36 0" />
+    <parent link="left_arm_link4" />
+    <child link="left_arm_link5" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="30" jerk="12" lower="-2.916972222" upper="2.916972222" velocity="1.5" />
+  </joint>
+  <link name="left_arm_link6">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link6_left.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="left_arm_joint6" type="revolute">
+    <origin rpy="1.5707963267949 1.5707963267949 0" xyz="0 0 0" />
+    <parent link="left_arm_link5" />
+    <child link="left_arm_link6" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="30" jerk="12" lower="-0.8226646259971648" upper="0.7353981633974483" velocity="1.5" />
+  </joint>
+  <link name="left_arm_link7">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link7_left.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="left_arm_joint7" type="revolute">
+    <origin rpy="1.5707963267949 0 0" xyz="0 0 0" />
+    <parent link="left_arm_link6" />
+    <child link="left_arm_link7" />
+    <axis xyz="0 0 1" />
+    <limit acceleration="2" effort="30" jerk="12" lower="-1.538202778" upper="1.538202778" velocity="1.5" />
+  </joint>
+  <link name="left_arm_end_effector_mount_link">
+    </link>
+  <joint name="left_arm_end_effector_mount_joint" type="fixed">
+    <origin rpy="3.141592653589793 0 3.141592653589793" xyz="-0.10926 0 0" />
+    <parent link="left_arm_link7" />
+    <child link="left_arm_end_effector_mount_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+  <joint name="left_arm_camera_stand_joint" type="fixed">
+    <parent link="left_arm_link7" />
+    <child link="left_arm_wrist_camera_stand" />
+  </joint>
+  <link name="left_arm_wrist_camera_stand">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/d405_stand_left.stl" />
+      </geometry>
+    </visual>
+  </link>
+  <joint name="left_arm_camera_joint" type="fixed">
+    <origin rpy="0 1.4807963267948965 3.141592653589793" xyz="-0.0822 0 -0.06842" />
+    <parent link="left_arm_wrist_camera_stand" />
+    <child link="left_wrist_camera_link" />
+  </joint>
+  <link name="left_wrist_camera_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/d405.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="left_gripper_mount_joint" type="fixed">
+    <origin rpy="1.5707963267948966 0 0" xyz="0 0 0" />
+    <parent link="left_arm_end_effector_mount_link" />
+    <child link="left_gripper_flange_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+  <link name="left_gripper_flange_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/flange.stl" />
+      </geometry>
+    </visual>
+  </link>
+  <joint name="left_gripper_base_joint" type="fixed">
+    <origin xyz="0.0065 0 0" rpy="0 0 0" />
+    <parent link="left_gripper_flange_link" />
+    <child link="left_gripper_base_link" />
+  </joint>
+  <link name="left_gripper_base_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/base_link.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="left_gripper_l_knuckle_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link1.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="left_gripper_l_inner_knuckle_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link2.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="left_gripper_l_finger_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link3.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="left_gripper_r_knuckle_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link1.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="left_gripper_r_inner_knuckle_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link2.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <link name="left_gripper_r_finger_link">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/link3_right_2.stl" />
+      </geometry>
+    </visual>
+    </link>
+  <joint name="left_gripper_joint" type="revolute">
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_r_knuckle_link" />
+    <origin rpy="1.5707963267948966 -1.2465 0" xyz="0.0745 0 0.0385" />
+    <axis xyz="0 0 -1" />
+    <limit effort="50.0" lower="0.0" upper="1.703" velocity="0.5" />
+  </joint>
+  <joint name="left_gripper_r_inner_knuckle_joint" type="revolute">
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_r_inner_knuckle_link" />
+    <origin rpy="1.5707963267948966 -1.2465 0" xyz="0.079 0 0.026" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" lower="-3.13" upper="3.13" velocity="2.0" />
+    <mimic joint="left_gripper_joint" multiplier="-1" />
+  </joint>
+  <joint name="left_gripper_r_finger_joint" type="revolute">
+    <parent link="left_gripper_r_inner_knuckle_link" />
+    <child link="left_gripper_r_finger_link" />
+    <origin rpy="0 0 -1.2465" xyz="0.045 0 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" lower="-3.13" upper="3.13" velocity="2.0" />
+    <mimic joint="left_gripper_joint" multiplier="1" />
+  </joint>
+  <joint name="left_gripper_l_knuckle_joint" type="revolute">
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_l_knuckle_link" />
+    <origin rpy="1.5707963267948966 1.2465 0" xyz="0.0745 0 -0.0385" />
+    <axis xyz="0 0 1" />
+    <limit effort="50" lower="-3.13" upper="3.13" velocity="0.5" />
+    <mimic joint="left_gripper_joint" multiplier="1" />
+  </joint>
+  <joint name="left_gripper_l_inner_knuckle_joint" type="revolute">
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_l_inner_knuckle_link" />
+    <origin rpy="1.5707963267948966 1.2465 0" xyz="0.079 0 -0.026" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" lower="-3.13" upper="3.13" velocity="2.0" />
+    <mimic joint="left_gripper_joint" multiplier="1" />
+  </joint>
+  <joint name="left_gripper_l_finger_joint" type="revolute">
+    <parent link="left_gripper_l_inner_knuckle_link" />
+    <child link="left_gripper_l_finger_link" />
+    <origin rpy="0 0 1.2465" xyz="0.045 0 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" lower="-3.13" upper="3.13" velocity="2.0" />
+    <mimic joint="left_gripper_joint" multiplier="-1" />
+  </joint>
+  <link name="left_gripper_tcp_link" />
+  <joint name="left_gripper_tcp_joint" type="fixed">
+    <parent link="left_gripper_base_link" />
+    <child link="left_gripper_tcp_link" />
+    <origin rpy="-1.5707963267948966 0 0" xyz="0.13996 0 0" />
+  </joint>
+  </robot>

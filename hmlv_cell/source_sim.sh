@@ -58,8 +58,16 @@ else
     echo "   ⚠️  ${_CELL_WS}/install not found — run: source source_sim.sh build"
 fi
 
+# Gazebo transport on loopback: ign-transport binds its discovery to the network
+# interface when a process starts, so a Wi-Fi address change mid-run (a DHCP renewal,
+# a roam) left the processes started before and after unable to find each other —
+# the duo demo's `ign topic` pose queries then got nothing ("no pose from Gazebo").
+# Everything here is on this machine; set IGN_IP yourself to reach another one.
+export IGN_IP="${IGN_IP:-127.0.0.1}"
+
 unset _CELL_WS _CELL_BUILD _CELL_FLAGS _CELL_PKGS _a
 
 echo "✨ Ready.  Launch e.g.:"
 echo "   ros2 launch hmlv_cell_gazebo transfer.launch.py              # Moz1 (default)"
 echo "   ros2 launch hmlv_cell_gazebo transfer.launch.py robot:=g1    # Galbot G1"
+echo "   ros2 launch hmlv_cell_gazebo duo.launch.py                   # G1 + Moz1"
