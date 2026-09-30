@@ -59,7 +59,7 @@ class DuoRobot(TransferDemo):
 
     def event(self, name):
         self.event_pub.publish(String(data=name))
-        self.get_logger().info(f"[{self.role}] {name}")
+        self.get_logger().info(f"event: {name}")      # the log is per robot already
 
     def setup_scene(self):
         """The cell, plus the four cans on the belt: the pair this robot picks as
@@ -108,6 +108,9 @@ class Supervisor(Node):
                                      lambda m, r=r: self._on_event(r, m.data), LATCHED)
         self.phase_pub = self.create_publisher(String, "/duo/phase", LATCHED)
         self.conveyor_start = self.create_publisher(Empty, "/conveyor/start", 10)
+        # the filled pair's new colour for RViz and the recording (the belt recolours
+        # it in Gazebo itself; the web replay only sees these)
+        self.recolor_pub = self.create_publisher(String, "/scene_markers/recolor", 10)
         self.conveyor_done = threading.Event()
         self.create_subscription(Empty, "/conveyor/done", lambda _m: self.conveyor_done.set(), 10)
 
@@ -174,6 +177,9 @@ class Supervisor(Node):
         self.get_logger().info("both pairs placed: belt fills the middle pair and indexes")
         self.phase_pub.publish(String(data="conveyor"))
         self.conveyor_done.clear()
+        for c in self.scene["belt_cans"]:           # the pair under the filler: filled now
+            if c["station"] == "fill":
+                self.recolor_pub.publish(String(data=f"{c['name']} {self.scene['filled_rgba']}"))
         for _ in range(3):
             self.conveyor_start.publish(Empty())
             if self.conveyor_done.wait(timeout=20.0):

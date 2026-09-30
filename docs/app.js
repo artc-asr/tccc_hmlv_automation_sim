@@ -186,7 +186,10 @@ function prepareRobot(model) {
 // ------------------------------------------------------------------ recording
 let run = null;
 let t0 = 0, t1 = 0;           // shown time range (recording time)
-let segs = [];                // [{key, label, desc, t, end, failed}]
+// Step groups, each with its own list: one for a one-robot run; for the duo, G1's,
+// the Moz1's and the line's (run.groups), so both robots show their current step at
+// once. {defs, fail, list: <ol>, bar: drives the top segment bar, segs: [...]}
+let groups = [];
 
 function index(t) {           // last sample at or before t
   const ts = run.t;
@@ -208,29 +211,35 @@ function poseAt(track, i, f, out) {
   return out.compose(_p, _q, _s);
 }
 
-function buildSegments() {
-  const defs = run.phase_defs ?? PHASES;       // the duo replay brings its own
-  const byKey = new Map(defs.map(([k, label, desc]) => [k, { key: k, label, desc }]));
-  const reached = run.phases.filter((p) => byKey.has(p.phase));
-  const failed = run.phases.some((p) => p.phase === "failed");
-  t0 = Math.max(run.t[0], (reached[0]?.t ?? run.t[0]) - LEAD_IN);
-  t1 = run.t[run.t.length - 1];
-  segs = defs.map(([k]) => ({ ...byKey.get(k), t: null, end: null, failed: false }));
+function buildGroup(g) {
+  const keys = new Set(g.defs.map(([k]) => k));
+  const reached = run.phases.filter((p) => keys.has(p.phase));
+  const failed = run.phases.some((p) => p.phase === g.fail);
+  g.segs = g.defs.map(([key, label, desc]) => ({ key, label, desc, t: null, end: null,
+                                                  failed: false }));
   reached.forEach((p, i) => {
-    const s = segs.find((x) => x.key === p.phase);
+    const s = g.segs.find((x) => x.key === p.phase);
+    if (s.t !== null) return;
     s.t = p.t;
     s.end = reached[i + 1]?.t ?? t1;
   });
-  if (failed && reached.length) segs.find((x) => x.key === reached.at(-1).phase).failed = true;
-  // "done" is instantaneous: give it the tail of the recording
-  const done = segs.find((s) => s.key === "done");
-  if (done && done.t !== null) done.end = t1;
+  if (failed && reached.length) g.segs.find((x) => x.key === reached.at(-1).phase).failed = true;
+  // the last step ("done") is instantaneous: give it the tail of the recording
+  const done = g.segs.at(-1);
+  if (done.key.endsWith("done") && done.t !== null) done.end = t1;
 }
 
-function renderPhaseList() {
-  const ol = $("phases");
-  ol.innerHTML = "";
-  segs.forEach((s, i) => {
+function buildGroups() {
+  t1 = run.t[run.t.length - 1];
+  const keys = new Set(groups.flatMap((g) => g.defs.map(([k]) => k)));
+  const first = run.phases.find((p) => keys.has(p.phase));
+  t0 = Math.max(run.t[0], (first?.t ?? run.t[0]) - LEAD_IN);
+  groups.forEach(buildGroup);
+}
+
+function renderGroup(g) {
+  g.list.innerHTML = "";
+  g.segs.forEach((s, i) => {
     const li = document.createElement("li");
     li.className = "phase";
     li.innerHTML = `<span class="dot">${i + 1}</span>
@@ -238,12 +247,13 @@ function renderPhaseList() {
       <span class="dur">${s.t === null ? "" : fmt(s.end - s.t)}</span>
       <span class="bar-fill"></span>`;
     if (s.t !== null) li.addEventListener("click", () => seek(s.t + 0.01));
-    ol.appendChild(li);
+    g.list.appendChild(li);
     s.el = li;
   });
+  if (!g.bar) return;
   const bar = $("segments");
   bar.innerHTML = "";
-  for (const s of segs) {
+  for (const s of g.segs) {
     if (s.t === null) continue;
     const d = document.createElement("div");
     d.style.flex = `${Math.max(s.end - s.t, 0.5)} 0 0`;
@@ -251,6 +261,29 @@ function renderPhaseList() {
     d.addEventListener("click", () => seek(s.t + 0.01));
     bar.appendChild(d);
     s.segEl = d;
+  }
+}
+
+function applyGroup(g) {
+  const cur = g.segs.reduce((acc, s) => (s.t !== null && s.t <= t ? s : acc), null);
+  for (const s of g.segs) {
+    const isCur = s === cur;
+    const done = s.t !== null && s.end <= t && !isCur;
+    s.el.classList.toggle("active", isCur && !s.failed);
+    s.el.classList.toggle("failed", isCur && s.failed && t >= s.end - 0.05);
+    s.el.classList.toggle("done", done || (isCur && s.key.endsWith("done")));
+    s.el.querySelector(".bar-fill").style.width =
+      isCur && s.end > s.t ? `${Math.min(100, ((t - s.t) / (s.end - s.t)) * 100)}%` : "0";
+    if (s.segEl) {
+      s.segEl.classList.toggle("active", isCur);
+      s.segEl.classList.toggle("done", done);
+      s.segEl.classList.toggle("failed", s.failed && t >= s.end - 0.05);
+    }
+  }
+  if (cur && cur.el.dataset.shown !== "1") {
+    g.segs.forEach((s) => (s.el.dataset.shown = ""));
+    cur.el.dataset.shown = "1";
+    if (!g.row) cur.el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 }
 
@@ -297,27 +330,7 @@ function apply(time) {
     for (const mat of m.mats) mat.color.setRGB(rgba[0], rgba[1], rgba[2], THREE.SRGBColorSpace);
   }
 
-  // states
-  const cur = segs.reduce((acc, s) => (s.t !== null && s.t <= t ? s : acc), null);
-  for (const s of segs) {
-    const isCur = s === cur;
-    const done = s.t !== null && s.end <= t && !isCur;
-    s.el.classList.toggle("active", isCur && !s.failed);
-    s.el.classList.toggle("failed", isCur && s.failed && t >= s.end - 0.05);
-    s.el.classList.toggle("done", done || (isCur && s.key === "done"));
-    s.el.querySelector(".bar-fill").style.width =
-      isCur && s.end > s.t ? `${Math.min(100, ((t - s.t) / (s.end - s.t)) * 100)}%` : "0";
-    if (s.segEl) {
-      s.segEl.classList.toggle("active", isCur);
-      s.segEl.classList.toggle("done", done);
-      s.segEl.classList.toggle("failed", s.failed && t >= s.end - 0.05);
-    }
-  }
-  if (cur && cur.el.dataset.shown !== "1") {
-    segs.forEach((s) => (s.el.dataset.shown = ""));
-    cur.el.dataset.shown = "1";
-    cur.el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }
+  groups.forEach(applyGroup);
   renderLog(t);
   $("clock").textContent = `${fmt(t - t0)} / ${fmt(t1 - t0)}`;
   if (!scrubbing) $("scrub").value = String(Math.round(((t - t0) / (t1 - t0)) * 1000));
@@ -429,8 +442,21 @@ if ([1, 2, 4, 8].includes(askedSpeed)) {
     ]);
     run = runData;
     buildScene(sceneData);
-    buildSegments();
-    renderPhaseList();
+    if (run.groups) {             // duo: G1 left, Moz1 right, the line under the view
+      document.body.classList.add("duo");
+      const [left, right, line] = run.groups;
+      $("phases-title").textContent = left.title;
+      $("phases2-title").textContent = right.title;
+      $("side-right").hidden = false;
+      $("linebar").hidden = false;
+      $("follow").hidden = true;
+      groups = [{ ...left, list: $("phases") }, { ...right, list: $("phases2") },
+                { ...line, list: $("linebar"), bar: true, row: true }];
+    } else {
+      groups = [{ defs: PHASES, fail: "failed", list: $("phases"), bar: true }];
+    }
+    buildGroups();
+    groups.forEach(renderGroup);
     // one robot: data/<id>/robot/; two: run.robots, each under its own dir
     const sources = run.robots ?? [{ dir: "robot/", joint_names: run.joint_names,
                                      joints: run.joints, base: run.base, label: robot.label }];

@@ -77,3 +77,21 @@ gripper: {open: 0.10, approach: 0.08, closed: 0.026,
 # The second entry is the same grasp yawed 180°. [x, y, z, w]
 grasp_quats: [[0.7071067812, 0.7071067812, 0.0, 0.0], [0.7071067812, -0.7071067812, 0.0, 0.0]]
 grasp_z_offset: 0.0        # tcp above the handle bar's centre
+
+# IK quality (transfer_demo.ik_ok; see robots/g1.yaml). In the duo run (2026-09-30)
+# KDL left both wrist rolls (LeftArm-6 / RightArm-6) ON their -90° limit from the
+# filled pick on: the left wrist swung 142° through the loaded drive, which should
+# hold still, and the wrist rolls travelled 340° placing into the box. Solutions
+# keep every arm joint 4° inside its limits and the wrist pitch (joint 6,
+# LeftArm-5 / RightArm-5: singular at 0) 2° off zero; paths 1° off the stops.
+# Only 2° (the G1 has 4° / 8°): the Moz1 reaches the deck box near the end of its
+# wrist-roll range, and at 4° / 5° no clean reach over the box remained (both
+# torso poses failed); what shook it was a joint exactly ON the stop.
+ik_filter: {limit_margin: 2.0, path_margin: 1.0, wrist_joint: 6, wrist_min: 2.0, tries: 25}
+# Curling the loaded arms in: straight lines only, else carry as they are (the IK
+# filter makes a straight tuck fail over to free space more often).
+tuck_straight_only: true
+# Over the box the hands keep the grasp yaw they hold the filled cans with (as the
+# G1's): with ik_filter the reach over the box once chose the other yaw, a wrist
+# half-turn (222° of joint travel) that swung one filled can into the other.
+keep_grasp_yaw: true

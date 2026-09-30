@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HMLV Transfer Replay</title>
-  <meta name="description" content="Replays of the jerry-can transfer demo (Spirit AI Moz1, Galbot G1) recorded in Gazebo: pallet A → conveyor → filling → box on pallet B.">
+  <meta name="description" content="Replays of the jerry-can transfer demo (Spirit AI Moz1, Galbot G1, and both together) recorded in Gazebo: pallet A → conveyor → filling → box on pallet B.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <!-- ?v=: bump on every change to style.css / app.js, or browsers mix cached and new files -->
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
   <script type="importmap">
   {
     "imports": {
@@ -48,7 +48,7 @@
 
   <main class="layout">
     <aside class="side">
-      <h2>States</h2>
+      <h2 id="phases-title">States</h2>
       <ol id="phases" class="phases"></ol>
       <h2>Demo log</h2>
       <div id="log" class="log" aria-live="polite"></div>
@@ -61,13 +61,19 @@
         <button id="reset" class="tool">Reset view</button>
       </div>
       <div class="hint">Drag to rotate · right-drag to pan · scroll to zoom</div>
+      <ol id="linebar" class="phases linebar" aria-label="Line" hidden></ol>
       <div id="loading" class="loading">
         <div class="spinner"></div>
         <div id="loading-text">Loading robot model…</div>
       </div>
     </section>
+
+    <aside id="side-right" class="side side-right" hidden>
+      <h2 id="phases2-title">States</h2>
+      <ol id="phases2" class="phases"></ol>
+    </aside>
   </main>
 
-  <script type="module" src="app.js?v=4"></script>
+  <script type="module" src="app.js?v=5"></script>
 </body>
 </html>

@@ -35,29 +35,35 @@ import trimesh
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "docs" / "data"
 LABELS = {"moz1": "Spirit AI Moz1", "g1": "Galbot G1", "duo": "G1 + Moz1"}
-# The duo replay's steps (record_run.py: "<ns>:<step>" per robot, the line's from
-# /duo/phase), listed in the order they happened in the run.
-DUO_PHASES = {
-    "cycle": ("Line starts", "Two filled cans wait at the belt's unload end, two empty "
-              "under the filler. The G1 stands at pallet A, the Moz1 at the unload end."),
-    "g1:pick_a": ("G1 · pick empties at pallet A", "4 layers, row 4: the torso leans over "
-                  "the stack and both arms pick a pair at once (0.2 kg each)."),
-    "moz1:pick_filled": ("Moz1 · pick the filled pair", "Both arms lift 8.4 kg off the "
-                         "belt's unload end and curl in; torso to its carry pose."),
-    "moz1:drive_b": ("Moz1 · carry to pallet B", "A gentle drive with the load (0.12 m/s)."),
-    "moz1:place_box": ("Moz1 · place into the box", "Crouch with the arms curled, then "
-                       "reach over the box on the deck and set both cans down."),
-    "g1:drive_load": ("G1 · carry to the belt", "Hands over the belt slots, then drive to "
-                      "the load station."),
-    "g1:place_conveyor": ("G1 · set the empties on the belt", "Guarded descent: stop 3 cm "
-                          "short, measure in Gazebo, correct the rest."),
-    "conveyor": ("Fill & index", "Both pairs placed: the filler fills the middle pair "
-                 "(4.2 kg, red), then the belt moves everything one station."),
-    "moz1:home": ("Moz1 · back to the unload end", "Home pose, then drive back."),
-    "g1:home": ("G1 · back to pallet A", "Home pose, then drive back."),
-    "done": ("Line back at its start", "Filled pair at the unload end, the G1's pair under "
-             "the filler: ready for the next cycle."),
-}
+# The duo replay's steps, in three groups the page shows side by side: each robot's
+# (record_run.py: "<ns>:<step>" from /<ns>/transfer_demo/phase) and the line's
+# (/duo/phase). [group id, title, [(key, label, description), ...]]
+DUO_GROUPS = [
+    ["g1", "G1 states", [
+        ("g1:pick_a", "Pick empties at pallet A", "4 layers, row 4: the torso leans over "
+         "the stack and both arms pick a pair at once (0.2 kg each)."),
+        ("g1:drive_load", "Carry to the belt", "Hands over the belt slots, then drive to "
+         "the load station."),
+        ("g1:place_conveyor", "Set the empties on the belt", "Guarded descent: stop 3 cm "
+         "short, measure in Gazebo, correct the rest."),
+        ("g1:home", "Back to pallet A", "Home pose, then drive back."),
+        ("g1:done", "Done", "At pallet A, ready for the next pair.")]],
+    ["moz1", "Moz1 states", [
+        ("moz1:pick_filled", "Pick the filled pair", "Both arms lift 8.4 kg off the belt's "
+         "unload end and curl in; torso to its carry pose."),
+        ("moz1:drive_b", "Carry to pallet B", "A gentle drive with the load (0.12 m/s)."),
+        ("moz1:place_box", "Place into the box", "Crouch with the arms curled, then reach "
+         "over the box on the deck and set both cans down."),
+        ("moz1:home", "Back to the unload end", "Home pose, then drive back."),
+        ("moz1:done", "Done", "At the unload end, ready for the next filled pair.")]],
+    ["line", "Line", [
+        ("cycle", "Robots at work", "Two filled cans wait at the belt's unload end, two "
+         "empty under the filler; both robots work at once."),
+        ("conveyor", "Fill & index", "Both pairs placed: the filler fills the middle pair "
+         "(4.2 kg, red), then the belt moves everything one station."),
+        ("done", "Line back at its start", "Filled pair at the unload end, the G1's pair "
+         "under the filler: ready for the next cycle.")]],
+]
 
 
 # ------------------------------------------------------------------ robot model
@@ -232,12 +238,10 @@ def build_duo(a, rec):
                        "joints": [[row[i] for i in keep] for row in r["joints"]],
                        "base": r["base"]})
     run = build_run(dict(rec, joint_names=[], joints=[], base=[]), set())
-    first = {}
-    for p in rec["phases"]:
-        first.setdefault(p["phase"], p["t"])
-    defs = sorted((k for k in DUO_PHASES if k in first), key=lambda k: first[k])
     run.update(robot="duo", robots=robots, joint_names=[], joints=[], base=[],
-               phase_defs=[[k, *DUO_PHASES[k]] for k in defs])
+               groups=[{"id": g, "title": title, "defs": [list(d) for d in defs],
+                        "fail": "failed" if g == "line" else f"{g}:failed"}
+                       for g, title, defs in DUO_GROUPS])
     return run
 
 
