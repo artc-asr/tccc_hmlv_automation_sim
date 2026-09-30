@@ -121,13 +121,17 @@ def launch_setup(context, *args, **kwargs):
                                      "right_targets": [m for sd, m in grasp_pairs
                                                        if sd == "right"] or [""]}])
 
-    def spawner(name):
+    def spawner(*names):
         return Node(package="controller_manager", executable="spawner", output="screen",
-                    arguments=[name, "--controller-manager", "/controller_manager"])
+                    arguments=[*names, "--controller-manager", "/controller_manager",
+                               "--controller-manager-timeout", "30"])
 
     jsb = spawner("joint_state_broadcaster")
-    controllers = [spawner(c) for c in (
-        "leg_controller",        # holds the upper body (else the leg folds)
+    # One spawner for all of them: six in parallel had a load_controller call time
+    # out now and then (the controller manager in gz is busy stepping the world) —
+    # right_gripper_controller never came up and the demo waited for it forever.
+    controllers = [spawner(
+        "leg_controller",        # first: holds the upper body (else the leg folds)
         "head_controller", "left_arm_controller", "right_arm_controller",
         "left_gripper_controller", "right_gripper_controller")]
     after_spawn = RegisterEventHandler(OnProcessExit(
@@ -145,7 +149,13 @@ def launch_setup(context, *args, **kwargs):
             "trajectory_execution.allowed_start_tolerance":
                 float(arg("allowed_start_tolerance"))}])
 
-    return [gz, rsp, spawn, bridge, grasp_helper, after_spawn, after_jsb, move_group]
+    # Spawn only once the world has loaded: on spawning, gz_ros2_control (inside the
+    # gz server) fetches robot_description from robot_state_publisher, and while gz is
+    # still busy loading the cell (950 shapes with 4 layers on pallet A) that reply
+    # times out ("failed to send response ... (timeout)") — then the controller
+    # manager never comes up and every spawner waits forever (2 of 4 launches).
+    spawn_later = TimerAction(period=float(arg("world_load_wait")), actions=[spawn])
+    return [gz, rsp, spawn_later, bridge, grasp_helper, after_spawn, after_jsb, move_group]
 
 
 def generate_launch_description():
@@ -154,6 +164,8 @@ def generate_launch_description():
         DeclareLaunchArgument("grasp_targets", default_value=""),
         DeclareLaunchArgument("gui", default_value="false"),
         DeclareLaunchArgument("spawn_delay", default_value="8.0"),
+        DeclareLaunchArgument("world_load_wait", default_value="6.0",
+                              description="s after starting gz before the robot is spawned"),
         DeclareLaunchArgument("allowed_start_tolerance", default_value="0.05"),
         OpaqueFunction(function=launch_setup),
     ])

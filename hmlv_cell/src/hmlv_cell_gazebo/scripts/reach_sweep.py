@@ -35,6 +35,7 @@ import xml.etree.ElementTree as ET
 import rclpy
 from moveit_msgs.msg import RobotState
 from moveit_msgs.srv import GetPositionFK
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
@@ -56,7 +57,8 @@ class ReachSweep(TransferDemo):
     def __init__(self):
         super().__init__()
         self.layers = int(self.declare_parameter("layers", 0).value) or self.scene["layers"]
-        rows = str(self.declare_parameter("rows", "").value)
+        rows = str(self.declare_parameter(       # "4" arrives as an integer
+            "rows", "", ParameterDescriptor(dynamic_typing=True)).value)
         self.rows = [int(r) for r in rows.split(",")] if rows else None
         self.do_box = bool(self.declare_parameter("box", True).value)
         self.grid = bool(self.declare_parameter("grid", True).value)
@@ -186,7 +188,7 @@ class ReachSweep(TransferDemo):
             bottoms = {sd: by_side[sd]["pos"] for sd in SIDES}
             hx = self.grasp_pose(bottoms["left"])
             t0 = time.monotonic()
-            found = self.check(bottoms, poses, sc["empty_mass"])
+            found = self.check(bottoms, poses, sc["empty_mass"], self.pick_approach)
             summary[row + 1] = self.report(
                 f"row {row + 1} (handles {hx[0]:.2f} m out, {hx[2]:.2f} m up in "
                 f"base_link; {time.monotonic() - t0:.0f} s)", found, poses)

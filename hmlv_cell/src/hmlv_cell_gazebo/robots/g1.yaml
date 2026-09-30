@@ -62,10 +62,19 @@ torso_presets:
   crouch: [34.4, 68.8, 34.4, 0, 0]        # (0.6, 1.2, 0.6): upright, shoulders ~0.25 m lower
   floor_lean: [17.2, 68.8, 85.9, 0, 0]    # (0.3, 1.2, 1.5): crouched, hips back, leaning
   floor_back: [2.9, 68.8, 100.3, 0, 0]    # (0.05, 1.2, 1.75): hips right back, leaning more
-# only poses that don't tip the robot (reach, reach_lean do, from row 4 on)
-pick_torsos: [home, lean, crouch]
-# the box on the floor: crouched upright (least lean with the load) first
-deck_torsos: [crouch, floor_lean, floor_back]
+  stretch: [51.6, 131.8, 97.4, 0, 0]      # (0.9, 2.3, 1.7): legs up and forward, leaning
+# only poses that don't tip the robot (reach, reach_lean do, from row 4 on). With
+# ik_filter (below) the sweep finds row 4 cleanly only from lean (8 cm approach,
+# see pick_approach) and stretch (centre of mass 0.148 m: least tipping margin).
+pick_torsos: [home, lean, stretch]
+# The box on the floor. Not crouch any more: it reaches the box only with an arm
+# joint on its limit (ik_filter); floor_lean 0.117 m, floor_back 0.070 m.
+deck_torsos: [floor_lean, floor_back]
+# Hands this high above pallet A's handles before the descent (default 0.12, the
+# pre-grasp height). With lean, 12 cm above the top layer (1.21 m) is the edge of
+# the arm's reach: every KDL solution had joint2 or joint7 within 1.2° of its
+# limit; 8 cm (still 5 cm of finger clearance over the handles) has clean ones.
+pick_approach: 0.08
 # Hands this high above the handles before going down into the box on pallet B
 # (default 0.12, the pre-grasp height, which clears the 10 cm walls by ~2 cm). With
 # 0.12 the G1's move over the box clipped the box wall with a held can and, planned
@@ -84,11 +93,32 @@ lean_group: torso_dual_arm
 # handle is at one end of the can, and the other yaw (a wrist half-turn, 230° of
 # joint travel) swung one can into the other.
 keep_grasp_yaw: true
+# Curling the loaded arms in: straight lines only (20, 15, 10, 5 cm), else carry as
+# they are — a free-space tuck with the filled pair swung the left wrist 150° with
+# joint6 / joint7 pressed on their limits for 10 s.
+tuck_straight_only: true
+# IK quality (transfer_demo.ik_ok). KDL, the G1's solver, clamps to the joint
+# limits and returns whatever branch it lands on: in the recorded run (2026-09-30)
+# arm joints sat exactly ON their limits in most phases, and the loaded right wrist
+# passed joint6 = 0 (its singularity: joints 5 and 7 aligned) — the tuck after the
+# filled pick wanted a 252° wrist swing, the fallback parked right joint5 on its
+# 167° limit, and the wrist then oscillated 25-33° p-p at ~1.5 Hz through the
+# whole loaded drive. So: IK solutions only with every arm joint >= limit_margin
+# (deg) inside its limits and |wrist_joint| >= wrist_min (deg), retried `tries`
+# times from seeds around the current arm; straight-line paths only within the
+# limit margin (else the move goes joint-space to such a solution).
+# path_margin (deg): straight-line paths only have to stay that far off the stops.
+ik_filter: {limit_margin: 4.0, path_margin: 1.0, wrist_joint: 6, wrist_min: 8.0, tries: 10}
 
 # <side>_gripper_joint: 0 open (124 mm between the finger pads) .. 1.703 closed.
-# From the URDF: 0.6 ≈ 94 mm, 0.9 ≈ 70 mm, 1.2 ≈ 44 mm, 1.42 ≈ 25 mm. Close to
-# the 24 mm bar; grasp_helper welds past 1.1 (≈ 52 mm, before the pads touch).
-gripper: {open: 0.6, approach: 0.9, closed: 1.42,
+# From the URDF: 0.6 ≈ 94 mm, 0.9 ≈ 70 mm, 1.2 ≈ 44 mm, 1.42 ≈ 25 mm (the 24 mm
+# bar); grasp_helper welds past 1.1 (≈ 52 mm, before the pads touch).
+# Closed to 1.30 (~35 mm), not onto the bar: KinematicGrasp holds the can on its
+# own, one physics step behind the hand, so fingers squeezing the bar (1.42) are in
+# contact with a can that lags into them whenever the body carries the hands:
+# during the loaded torso move to the box the fingers were shoved 1.24-1.52 and
+# both wrist rolls (joint7) twisted 30° with ±15° jitter, uncommanded.
+gripper: {open: 0.6, approach: 0.9, closed: 1.30,
           closed_threshold: 1.1, open_threshold: 0.9,
           detach_on_open: false}
 # detach_on_open false: grasp_helper releases a can only when told to (the demo

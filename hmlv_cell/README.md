@@ -143,5 +143,18 @@ controllers (`<side>_arm_controller`, `<side>_gripper_controller`, a torso contr
 - **Over the box the hands keep their grasp yaw** (`keep_grasp_yaw`): the handle is at
   one end of the can, and the other yaw — a wrist half-turn — swung one filled can into
   the other.
+- **IK quality** (`ik_filter` in `robots/g1.yaml`): KDL clamps to the joint limits and
+  returns whatever branch it lands on — arm joints sat exactly on their limits in most
+  phases and the loaded wrist passed its singularity (`joint6` = 0): the tuck after the
+  filled pick wanted a 252° wrist swing, and the fallback left the wrist oscillating
+  through the whole loaded drive. IK solutions now keep every arm joint 4° inside its
+  limits and `joint6` 8° off zero (retried from seeds around the current arm), straight
+  paths stay 1° off the stops, the loaded tuck is straight-line only, pallet A is
+  approached from 8 cm (12 cm above the 4-layer stack was the edge of reach) and the box
+  is placed from `floor_lean` / `floor_back`. Still open: both wrist rolls buzz ±11°
+  while the loaded torso lowers to the box (uncommanded; independent of torso speed).
+- **Startup:** the robot spawns once the world has loaded, and one spawner starts all
+  controllers — otherwise now and then the controller manager never came up (a
+  `robot_description` fetch or a `load_controller` call timed out) and the demo waited.
 - **Effort limits** are raised at launch to the actuator force ranges of Galbot's MuJoCo
   model, as `galbot_g1_gazebo` does (the URDF's are too weak to hold the leg up).
