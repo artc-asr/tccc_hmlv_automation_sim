@@ -10,10 +10,11 @@ Reads the scene YAML written by transfer_scene.py and runs, once:
      in front of the pallet.
   →  drive to the conveyor's LOAD station, set both cans on the belt.
   →  run the conveyor: the cans travel to the UNLOAD station and are filled to
-     4.2 kg on the way (ConveyorBelt gz plugin).
-  →  drive to the UNLOAD station, pick both FILLED cans at once.
-  B  drive to pallet B, crouch/lean the torso as needed, place both on the deck
-     (bottom level) in the row nearest the robot.
+     4.2 kg on the way, and turn red (ConveyorBelt gz plugin).
+  →  drive to the UNLOAD station, pick both FILLED cans at once, curl both arms
+     in (cans close to the chest: the load's centre of gravity nearer the torso).
+  B  drive to pallet B, crouch/lean the torso with the arms still curled, then
+     reach out and place both into the open box on the deck.
 
 Every placement is verified against Gazebo's own poses. Both arms move together:
 free-space moves are one `dual_arm` MoveIt plan to per-arm IK solutions;
@@ -70,6 +71,10 @@ PICK_TORSOS = ["home", "lean45", "lean60", "lean75"]      # least lean first
 # cans are driven down through the pallet deck before it gives up; low_lean has
 # placed cleanly every run.
 DECK_TORSOS = ["low_lean", "lean75"]
+# Curling the loaded arms in before driving: the hands are pulled back toward the
+# chest by the first of these that plans (straight line or free space, the held
+# cans collision-checked against the body). Height and hand spacing are kept.
+TUCK_IN = [0.20, 0.15, 0.10, 0.05]     # m, toward the robot
 ARM_JOINTS = {s: [f"{s.capitalize()}Arm-{i}" for i in range(7)] for s in SIDES}
 
 
@@ -582,6 +587,21 @@ class TransferDemo(JerrycanDemo):
         return self.dual_corridor(poses, {s: [poses[s][2] - height] for s in SIDES},
                                   "above the slots")
 
+    def tuck(self, quats):
+        """Curl both loaded arms in (see TUCK_IN). Best effort: if no tuck plans,
+        carry as before. Returns the quats in use."""
+        now = {s: self.tcp_now(s) for s in SIDES}
+        for dx in TUCK_IN:
+            try:
+                q = self.dual_move_to({s: (p[0] - dx, p[1], p[2]) for s, p in now.items()},
+                                      quats, f"the tuck ({dx * 100:.0f} cm in)", speed=0.1)
+                self.get_logger().info(f"arms curled in {dx * 100:.0f} cm for the carry")
+                return q
+            except StepFailed as exc:
+                self.get_logger().info(f"  tuck {dx * 100:.0f} cm: {exc}")
+        self.get_logger().warn("no tuck planned: carrying with the arms out")
+        return quats
+
     def run(self):
         self.wait_for_servers()
         for c in [self.ik]:
@@ -598,7 +618,7 @@ class TransferDemo(JerrycanDemo):
         top = s["conveyor"]["top"]
         self.get_logger().info(
             f"4 L jerry cans: {s['empty_mass']} kg empty, {s['filled_mass']} kg filled. "
-            f"One pair: pallet A → conveyor → filling → pallet B")
+            f"One pair: pallet A → conveyor → filling → box on pallet B")
         self.drive_to(*st["A"], "pallet A")
         self.setup_scene()
         self.dual_gripper(GRIPPER_APPROACH)
@@ -657,12 +677,18 @@ class TransferDemo(JerrycanDemo):
         bottoms = {s_: self.locate(names[s_], unload[s_], tol=0.04) for s_ in SIDES}
         quats = self.pick_pair(names, bottoms, PRE_GRASP + 0.05, "filled")
         self.get_logger().info(f"picked both (filled, {s['filled_mass']} kg each)")
+        # Curl the arms in first: the 8.4 kg comes toward the chest, which takes
+        # moment off the hip and waist for the torso move and the drive.
+        quats = self.tuck(quats)
         # Carry posture before driving: hips back, chest upright. At home with the
         # hands 0.53 m out the hip joint carries ~81 of its 100 N·m and the torso
         # folded under the drive; this brings it to ~48 N·m (see TORSO_PRESETS).
         self.torso_to("carry")
 
-        # --- pallet B: bottom level, nearest row (loaded: drive gently)
+        # --- pallet B: into the open box on the deck (loaded: drive gently).
+        # The torso goes down with the arms still curled, and only then do the arms
+        # reach out over the box: the load is extended only once its centre of
+        # gravity is low.
         self.drive_to(*st["B"], "pallet B", vmax=0.12, accel=0.15)
         slots = s["b_slots"]
         deck = {s_: (slots[s_][0], slots[s_][1], slots[s_][2] + 0.003) for s_ in SIDES}
@@ -674,19 +700,20 @@ class TransferDemo(JerrycanDemo):
                                      for s_ in SIDES}, torso) is not None
                        for dz in (PRE_GRASP, 0.0)):
                 continue
-            self.get_logger().info(f"pallet B deck: torso '{preset}'")
-            self.torso_to(preset)
+            self.get_logger().info(f"pallet B box: torso '{preset}', arms curled")
             try:
+                self.torso_to(preset)
+                self.get_logger().info("  torso down: reaching out over the box")
                 quats = self.above(slots, PRE_GRASP)
                 break
             except StepFailed as exc:
                 self.get_logger().info(f"  {exc} — trying the next torso pose")
         if quats is None:
-            raise StepFailed("pallet B's deck is out of reach for every torso pose")
-        self.place_pair(names, slots, quats, "pallet-B deck")
+            raise StepFailed("the box on pallet B is out of reach for every torso pose")
+        self.place_pair(names, slots, quats, "pallet-B box")
         self.torso_to("home")
         self.arms_home()
-        self.get_logger().info("done: both filled jerry cans verified on pallet B")
+        self.get_logger().info("done: both filled jerry cans verified in the box on pallet B")
 
 
 def main():
