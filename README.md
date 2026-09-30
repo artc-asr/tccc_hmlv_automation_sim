@@ -1,4 +1,18 @@
-# spiritai_moz1_simulation
+# tccc_hmlv_automation_sim
+
+Robot simulations for TCCC HMLV automation (jerry-can handling: depalletising,
+filling line, palletising). Formerly `spiritai_moz1_simulation`.
+
+| Robot | Simulator | Status |
+|---|---|---|
+| Spirit AI **Moz1** | Gazebo Fortress / Isaac Sim | this workspace (below) |
+| Galbot **G1** | Gazebo Harmonic | planned |
+| Rainbow Robotics **RB-Y1** | Gazebo Harmonic | planned |
+
+Each robot will get its own colcon workspace: Moz1 runs Gazebo Fortress, the
+others Gazebo Harmonic, and the two can't share one workspace.
+
+## Spirit AI Moz1
 
 A **self-contained simulation** of the Spirit AI **Moz1** dual-arm mobile manipulator
 for **Ubuntu 22.04 / ROS 2 Humble**: the full URDF and TF tree, MoveIt 2, Nav2 +
@@ -99,8 +113,8 @@ For the Isaac backend, also `ros-humble-topic-based-ros2-control` — see
 ## Build & run
 
 ```bash
-git clone https://github.com/artc-asr/spiritai_moz1_simulation.git
-cd spiritai_moz1_simulation
+git clone https://github.com/artc-asr/tccc_hmlv_automation_sim.git
+cd tccc_hmlv_automation_sim
 source source_sim.sh build          # colcon build --symlink-install, then source
 source source_sim.sh                # every new terminal
 ```
