@@ -121,6 +121,7 @@ def launch_setup(context, *args, **kwargs):
     u = subprocess.check_output(["xacro", g1_xacro], text=True)
     u = g1_launch.use_mjcf_actuator_limits(
         u, get_package_share_directory("galbot_one_golf_description"))
+
     urdf["g1"] = _namespace_urdf(moz1_launch._inject_grasp_welds(u, grasp["g1"]), "g1",
                                  params_file)
     u = subprocess.check_output(
@@ -179,8 +180,6 @@ def launch_setup(context, *args, **kwargs):
         spawn = Node(package="ros_gz_sim", executable="create", output="screen",
                      arguments=["-topic", f"/{ns}/robot_description", "-name", model_name[ns],
                                 "-x", str(x), "-y", str(y), "-z", str(z)])
-        # spawn once the world has loaded (see g1_sim.launch.py)
-        nodes.append(TimerAction(period=float(arg("world_load_wait")), actions=[spawn]))
         spawner = Node(package="controller_manager", executable="spawner", output="screen",
                        arguments=["joint_state_broadcaster", *controllers[ns],
                                   "left_arm_controller", "right_arm_controller",
@@ -216,15 +215,22 @@ def launch_setup(context, *args, **kwargs):
             condition=IfCondition(arg("demo")),
             parameters=[{"use_sim_time": True, "scene_file": scene_file,
                          "robot_file": profile_files[ns], "speed": float(arg("speed"))}]))
-    # The controllers of one robot, THEN the other's: both controller managers run in
-    # the one gz process, and two loading the same controller library at once hit a
-    # pluginlib race ("... explicitly loaded through MultiLibraryClassLoader::
-    # loadLibrary()") — torso_controller failed to load, the Moz1 never moved.
+    # One robot at a time: the G1 spawned (once the world has loaded, see
+    # g1_sim.launch.py) and its controllers up, THEN the Moz1 spawned and its
+    # controllers up. Both run in the one gz process, and at the same time
+    #  * two gz_ros2_control instances fetching robot_description at once: one
+    #    fetch timed out ("failed to send response ... (timeout)") and that robot's
+    #    controller manager never came up;
+    #  * two controller managers loading the same controller library at once hit a
+    #    pluginlib race ("... explicitly loaded through MultiLibraryClassLoader::
+    #    loadLibrary()") — torso_controller failed to load.
+    nodes.append(TimerAction(period=float(arg("world_load_wait")), actions=[spawns["g1"]]))
+    for ns in ("g1", "moz1"):
+        nodes.append(RegisterEventHandler(OnProcessExit(
+            target_action=spawns[ns],
+            on_exit=[TimerAction(period=float(arg("spawn_delay")), actions=[spawners[ns]])])))
     nodes.append(RegisterEventHandler(OnProcessExit(
-        target_action=spawns["g1"],
-        on_exit=[TimerAction(period=float(arg("spawn_delay")), actions=[spawners["g1"]])])))
-    nodes.append(RegisterEventHandler(OnProcessExit(
-        target_action=spawners["g1"], on_exit=[spawners["moz1"]])))
+        target_action=spawners["g1"], on_exit=[spawns["moz1"]])))
     nodes += demo_nodes
     # the cans' poses on the global /tf (gz_world -> jerrycan_*), for the recording
     nodes.append(Node(
