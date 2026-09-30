@@ -21,6 +21,8 @@ node picks which one to fire:
     `closed_threshold` / `open_threshold` (defaults: the Moz1's stroke) set the
     edges; a closed_threshold ABOVE open_threshold means the joint grows as the
     gripper closes (e.g. the Galbot G1's, 0 open .. 1.703 closed).
+    `detach_on_open` false: the open edge doesn't detach — only the explicit
+    detach does — for a gripper whose fingers get pushed open under load.
   * `/grasp/<side>/{attach,detach}` (std_msgs/Empty) — manual override, same
     effect as the close/open edge.
 
@@ -62,6 +64,7 @@ class GraspHelper(Node):
         self.open_at = float(self.declare_parameter("open_threshold", OPEN_THRESH).value)
         # +1: the joint shrinks as the gripper closes (Moz1), -1: it grows (G1)
         self.sign = 1.0 if self.closed_at < self.open_at else -1.0
+        self.detach_on_open = bool(self.declare_parameter("detach_on_open", True).value)
         self._did_startup = False
 
         for side in SIDES:
@@ -123,7 +126,13 @@ class GraspHelper(Node):
                 self._attach(side)
             elif self.closed[side] and self.sign * (p - self.open_at) > 0:
                 self.closed[side] = False
-                self._detach(side)
+                if self.detach_on_open:
+                    self._detach(side)
+                elif self.held[side] is not None:
+                    # a release (the explicit detach follows) or fingers pushed open
+                    self.get_logger().info(
+                        f"{side} gripper reads open ({p:.2f}): {self.held[side]} stays "
+                        "attached until an explicit detach")
 
 
 def main():

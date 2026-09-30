@@ -114,6 +114,8 @@ def launch_setup(context, *args, **kwargs):
                         parameters=[{"use_sim_time": True,
                                      "closed_threshold": float(g["closed_threshold"]),
                                      "open_threshold": float(g["open_threshold"]),
+                                     # the demo detaches explicitly when it releases
+                                     "detach_on_open": bool(g.get("detach_on_open", True)),
                                      "left_targets": [m for sd, m in grasp_pairs
                                                       if sd == "left"] or [""],
                                      "right_targets": [m for sd, m in grasp_pairs

@@ -53,7 +53,12 @@ box_approach: 0.17
 # From the URDF: 0.6 ≈ 94 mm, 0.9 ≈ 70 mm, 1.2 ≈ 44 mm, 1.42 ≈ 25 mm. Close to
 # the 24 mm bar; grasp_helper welds past 1.1 (≈ 52 mm, before the pads touch).
 gripper: {open: 0.6, approach: 0.9, closed: 1.42,
-          closed_threshold: 1.1, open_threshold: 0.9}
+          closed_threshold: 1.1, open_threshold: 0.9,
+          detach_on_open: false}
+# detach_on_open false: grasp_helper releases a can only when told to (the demo
+# does, in place_pair). Loaded and swinging fast (the 237° move over the box on
+# pallet B) the G1's fingers get pushed open past 0.9: the open edge detached the
+# can 4 times mid-move, it dropped each time and was re-welded 18 cm lower.
 # Top-down grasp, jaw closing along base x across the handle bar. The G1's tcp
 # approaches along its +X and the fingers close along ±Y, so x_tcp = -z,
 # y_tcp = +x, z_tcp = -y; the second entry is the same grasp yawed 180°. [x, y, z, w]
