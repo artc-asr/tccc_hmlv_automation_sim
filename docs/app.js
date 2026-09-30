@@ -31,6 +31,11 @@ let DATA = "data/moz1/";
 const LEAD_IN = 1.5;          // s of the recording shown before the first step
 
 const $ = (id) => document.getElementById(id);
+// revalidate the data (a new recording keeps its URLs)
+const getJSON = (url) => fetch(url, { cache: "no-cache" }).then((r) => {
+  if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+  return r.json();
+});
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 // ------------------------------------------------------------------ three.js setup
@@ -411,14 +416,14 @@ if ([1, 2, 4, 8].includes(askedSpeed)) {
 // ------------------------------------------------------------------ load
 (async () => {
   try {
-    const index = await fetch("data/index.json").then((r) => r.json());
+    const index = await getJSON("data/index.json");
     const robots = index.robots;
     const robot = robots.find((r) => r.id === params.get("robot")) ?? robots[0];
     DATA = `data/${robot.id}/`;
     renderRobotSwitch(robots, robot);
     const [runData, sceneData] = await Promise.all([
-      fetch(`${DATA}run.json`).then((r) => r.json()),
-      fetch(`${DATA}scene.json`).then((r) => r.json()),
+      getJSON(`${DATA}run.json`),
+      getJSON(`${DATA}scene.json`),
     ]);
     run = runData;
     buildScene(sceneData);
