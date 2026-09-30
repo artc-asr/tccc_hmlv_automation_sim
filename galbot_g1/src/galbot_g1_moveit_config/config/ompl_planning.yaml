@@ -43,6 +43,9 @@ dual_arm:
   planner_configs:
     - RRTConnectkConfigDefault
     - RRTstarkConfigDefault
+torso_dual_arm:
+  planner_configs:
+    - RRTConnectkConfigDefault
 
 left_gripper:
   planner_configs:

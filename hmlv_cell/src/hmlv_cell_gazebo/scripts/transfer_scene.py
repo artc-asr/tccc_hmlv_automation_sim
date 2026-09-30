@@ -25,6 +25,8 @@ driving along y, always in front of the pallets and the conveyor):
                           filled pair goes into it, side by side. The box sits
                           on the deck (not the floor) so the deck place poses
                           still hold: the cans end up one box floor higher.
+                          --box-on-floor: no pallet B, the box stands on the
+                          floor where the deck's nearest row was.
 
 Only the top layer's first remaining row of pallet A is dynamic (the pick
 candidates); everything else is static. 4 L cans only, TCCC dimensions from the
@@ -64,7 +66,7 @@ CARDBOARD_RGBA = "0.80 0.64 0.42 1"
 
 
 def build_scene(cleared_rows=2, layers=LAYERS, base_front=MOZ1_BASE_FRONT, base_z=MOZ1_BASE_Z,
-                world_name="hmlv_transfer"):
+                world_name="hmlv_transfer", box_on_floor=False):
     c = CONTAINERS["4"]
     h, L, W = c["h"] / 1000, c["L"] / 1000, c["W"] / 1000
     bar_len = min(0.11, L - 0.09)
@@ -72,6 +74,7 @@ def build_scene(cleared_rows=2, layers=LAYERS, base_front=MOZ1_BASE_FRONT, base_
            "grasp_z": h - BAR_H / 2, "bar_len": bar_len}
     x0 = base_front + PALLET["gap"]
     deck = PALLET["deck"]
+    box_z = 0.0 if box_on_floor else deck      # pallet B: the box on the floor or the deck
     cols = int(PALLET["length"] // (L + CAN_GAP))
     rows = int(PALLET["depth"] // (W + CAN_GAP))
     if not 0 <= cleared_rows < rows:
@@ -110,15 +113,16 @@ def build_scene(cleared_rows=2, layers=LAYERS, base_front=MOZ1_BASE_FRONT, base_
         {"name": "conveyor", "center": [(cv["x_min"] + cv["x_max"]) / 2,
                                         (cv["y_min"] + cv["y_max"]) / 2, cv["top"] / 2],
          "size": [cv["x_max"] - cv["x_min"], cv["y_max"] - cv["y_min"], cv["top"]]},
-        {"name": "pallet_b", "center": [x0 + PALLET["depth"] / 2, PALLET_B_Y, deck / 2],
-         "size": [PALLET["depth"], PALLET["length"], deck]},
     ]
+    if not box_on_floor:
+        boxes.append({"name": "pallet_b", "center": [x0 + PALLET["depth"] / 2, PALLET_B_Y, deck / 2],
+                      "size": [PALLET["depth"], PALLET["length"], deck]})
     # the box: around the two middle slots of pallet B's nearest row
     slot_x = row_x(0) + BOX["shift"]
     slot_y = {"left": col_y(cols // 2, PALLET_B_Y), "right": col_y(cols // 2 - 1, PALLET_B_Y)}
     t, fl, wh, m = BOX["wall"], BOX["floor"], BOX["wall_h"], BOX["margin"]
     inner = [W + 2 * m, abs(slot_y["left"] - slot_y["right"]) + L + 2 * m]
-    box = {"center": [slot_x, (slot_y["left"] + slot_y["right"]) / 2, deck],   # bottom centre
+    box = {"center": [slot_x, (slot_y["left"] + slot_y["right"]) / 2, box_z],   # bottom centre
            "inner": inner, "wall": t, "floor": fl, "wall_h": wh, "flap": BOX["flap"]}
     boxes += _box_parts(box)
     if cleared_rows + 1 < rows:     # the top layer behind the candidate row, handles included
@@ -141,8 +145,9 @@ def build_scene(cleared_rows=2, layers=LAYERS, base_front=MOZ1_BASE_FRONT, base_
         "belt_offset": BELT_OFFSET,
         "conveyor": cv,
         "travel": STATIONS["unload"] - STATIONS["load"],
-        # pallet B: inside the box on the deck (can bottoms on the box floor)
-        "b_slots": {s_: [slot_x, slot_y[s_], deck + fl] for s_ in ("left", "right")},
+        # pallet B: inside the box, on the deck or the floor (can bottoms on the box floor)
+        "b_slots": {s_: [slot_x, slot_y[s_], box_z + fl] for s_ in ("left", "right")},
+        "box_on_floor": box_on_floor,
         "box_b": box,
         "filled_rgba": FILLED_RGBA,
         "targets": targets,
@@ -190,7 +195,7 @@ def box_model(b):
                      f"{_box_geom(*size)}{_mat(CARDBOARD_RGBA)}</visual>")
     body = "\n        ".join(parts)
     return f"""
-    <!-- open cardboard box on pallet B for the filled pair -->
+    <!-- open cardboard box at pallet B for the filled pair -->
     <model name="box_b"><static>true</static><pose>0 0 0 0 0 0</pose>
       <link name="link">
         {body}
@@ -203,9 +208,9 @@ def world_sdf(s):
     W, L, h = c["W"], c["L"], c["h"]
     m = s["empty_mass"]
     ixx, iyy, izz = m / 12 * (L ** 2 + h ** 2), m / 12 * (W ** 2 + h ** 2), m / 12 * (W ** 2 + L ** 2)
-    models = [pallet_model("pallet_a", s["pallet"]["x0"], 0.0, s["pallet"]),
-              pallet_model("pallet_b", s["pallet"]["x0"], PALLET_B_Y, s["pallet"]),
-              box_model(s["box_b"])]
+    models = [pallet_model("pallet_a", s["pallet"]["x0"], 0.0, s["pallet"]), box_model(s["box_b"])]
+    if not s["box_on_floor"]:
+        models.append(pallet_model("pallet_b", s["pallet"]["x0"], PALLET_B_Y, s["pallet"]))
 
     geo = "\n        ".join(_can_geometry(s, *pos, prefix=f"c{i}_", stacked=True)
                            for i, pos in enumerate(s["static_cans"]))
@@ -328,10 +333,12 @@ def main():
                     help="x of the robot's chassis front in base_link (m)")
     ap.add_argument("--base-z", type=float, default=MOZ1_BASE_Z,
                     help="base_link height above the ground (m)")
+    ap.add_argument("--box-on-floor", action="store_true",
+                    help="no pallet B: the box for the filled pair stands on the floor")
     ap.add_argument("--out-dir", default=".")
     ap.add_argument("--name", default="hmlv_transfer", help="world name and file stem")
     a = ap.parse_args()
-    s = build_scene(a.cleared_rows, a.layers, a.base_front, a.base_z, a.name)
+    s = build_scene(a.cleared_rows, a.layers, a.base_front, a.base_z, a.name, a.box_on_floor)
     os.makedirs(a.out_dir, exist_ok=True)
     world = os.path.join(a.out_dir, f"{a.name}.world")
     with open(world, "w") as f:

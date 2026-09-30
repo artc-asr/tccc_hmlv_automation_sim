@@ -7,6 +7,16 @@ moveit_config: {robot: galbot_g1, package: galbot_g1_moveit_config}
 scene:
   base_front: 0.307        # chassis front face, x in base_link (collision bounds, ±0.307 m square)
   base_z: 0.032            # base_link height resting on the ground (measured, Fortress)
+  # Pallet A one layer higher than the Moz1's (4: top-layer handles 1.09 m up in
+  # base_link), picked from row 4 (0.79 m out): the highest and furthest the G1
+  # picks WITHOUT TIPPING (scripts/reach_sweep.py, 90 leg poses, 2026-09-30).
+  # 4 layers: rows 1-5 in reach, 6-8 not; row 5 only with the upper body fully
+  # forward, which puts the centre of mass past the front wheels (x 0.18-0.25 m
+  # vs 0.176): leaning there the G1 tipped 4.4° onto them and slid 6 cm back.
+  # Row 4: 6 stable poses. 5 layers (handles 1.33 m): not even row 3 in reach.
+  layers: 4
+  cleared_rows: 3
+  box_on_floor: true       # no pallet B: the box for the filled pair stands on the floor
 
 tcp_link: "{side}_gripper_tcp_link"
 touch_links: [gripper_flange_link, gripper_base_link, gripper_tcp_link,
@@ -32,6 +42,15 @@ torso_controller: leg_controller
 # (collision-aware, both arms, pre-grasp and grasp; scene with cleared_rows 4, 3 layers):
 #   pallet A row 5 (handles 0.92 m out): not from home; reach, lean, reach_lean, …
 #   conveyor: home and most poses;  pallet-B box: crouch, reach and many low poses.
+# Re-swept for 4 layers and the box on the floor with reach_sweep.py, which also
+# checks tipping: the whole robot's centre of mass (95 kg, only 23 kg of it in
+# the chassis; 17 kg in leg_link1, which leg_joint1 swings forward) must stay
+# behind x = 0.15 m in base_link — the front wheels touch down at 0.176 m.
+# Centre of mass x at the grasp:
+#   pallet A row 4, empty pair: lean 0.138, (0.6, 1.5, 1.2) 0.147; reach 0.180,
+#     reach_lean 0.231 TIP.  Row 5: every pose that reaches it tips (0.18-0.25).
+#   box on the floor, filled pair (8.4 kg): crouch 0.144, floor_lean 0.125,
+#     floor_back 0.070; (0.6, 1.2, 1.2) 0.188 and (0.6, 0.9, 0.9) 0.214 TIP.
 # The leg actuators are rated 280-420 N·m (Galbot's MuJoCo model), so unlike the
 # Moz1's torso the loaded pair needs no special carry posture.
 torso_presets:
@@ -41,13 +60,30 @@ torso_presets:
   lean: [34.4, 103.1, 103.1, 0, 0]        # (0.6, 1.8, 1.8): leaning forward
   reach_lean: [51.6, 103.1, 85.9, 0, 0]   # (0.9, 1.8, 1.5)
   crouch: [34.4, 68.8, 34.4, 0, 0]        # (0.6, 1.2, 0.6): upright, shoulders ~0.25 m lower
-pick_torsos: [home, reach, lean, reach_lean, crouch]
-deck_torsos: [crouch, reach]
+  floor_lean: [17.2, 68.8, 85.9, 0, 0]    # (0.3, 1.2, 1.5): crouched, hips back, leaning
+  floor_back: [2.9, 68.8, 100.3, 0, 0]    # (0.05, 1.2, 1.75): hips right back, leaning more
+# only poses that don't tip the robot (reach, reach_lean do, from row 4 on)
+pick_torsos: [home, lean, crouch]
+# the box on the floor: crouched upright (least lean with the load) first
+deck_torsos: [crouch, floor_lean, floor_back]
 # Hands this high above the handles before going down into the box on pallet B
 # (default 0.12, the pre-grasp height, which clears the 10 cm walls by ~2 cm). With
 # 0.12 the G1's move over the box clipped the box wall with a held can and, planned
 # around it, once ended 11 cm off the slot.
 box_approach: 0.17
+# The lean over pallet A with the arms straight to the pre-grasp: if that direct
+# move collides (an IK solution on another arm branch), try this many fresh IK
+# solutions, least joint travel first, before leaning with the arms at home —
+# which runs the hands into the 4-layer stack.
+lean_retries: 6
+# ... and if all of those collide (the 4-layer stack's row 4: every solution
+# was a ~200° swing through a neighbouring can), plan torso and arms together
+# around the stack with this SRDF group (galbot_g1_moveit_config).
+lean_group: torso_dual_arm
+# Over the box the hands keep the grasp yaw they hold the filled cans with: the
+# handle is at one end of the can, and the other yaw (a wrist half-turn, 230° of
+# joint travel) swung one can into the other.
+keep_grasp_yaw: true
 
 # <side>_gripper_joint: 0 open (124 mm between the finger pads) .. 1.703 closed.
 # From the URDF: 0.6 ≈ 94 mm, 0.9 ≈ 70 mm, 1.2 ≈ 44 mm, 1.42 ≈ 25 mm. Close to

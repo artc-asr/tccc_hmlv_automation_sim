@@ -19,8 +19,8 @@ a leftover Gazebo server or demo node hijacks the next run.
 | arg | default | |
 |---|---|---|
 | `robot` | `moz1` | `moz1` \| `g1` — a profile in `robots/<robot>.yaml` |
-| `cleared_rows` | `4` | top-layer rows of pallet A already gone; the pair comes from the next row (row 5, 0.9 m out: the robot has to lean or reach) |
-| `layers` | `3` | stack height on pallet A |
+| `cleared_rows` | profile (Moz1 `4`, G1 `3`) | top-layer rows of pallet A already gone; the pair comes from the next row (Moz1: row 5, 0.9 m out, it has to lean or reach) |
+| `layers` | profile (Moz1 `3`, G1 `4`) | stack height on pallet A |
 | `demo` | `true` | run the sequence |
 | `speed` | `0.4` | free-space velocity scaling |
 | `gui` / `rviz` | `false` / `true` | Gazebo's own window / the RViz view |
@@ -34,7 +34,7 @@ a leftover Gazebo server or demo node hijacks the next run.
 | **conveyor load** (1.3) | both cans set on the belt side by side |
 | conveyor | carries them 2.2 m to the filling station; each becomes **4.2 kg** and turns red (`ConveyorBelt` plugin) |
 | **conveyor unload** (3.5) | both arms pick the **filled** pair, curl in toward the chest, torso to its carry pose |
-| **pallet B** (5.3) | torso down with the arms curled, then both cans placed into the box on the deck |
+| **pallet B** (5.3) | torso down with the arms curled, then both cans placed into the box on the deck (G1: the box on the floor, no pallet) |
 
 It ends with `done: both filled jerry cans verified in the box on pallet B`; every
 placement is checked against Gazebo's own model poses. RViz is the view (Gazebo runs
@@ -58,6 +58,7 @@ src/hmlv_cell_gazebo/
   robots/g1/                    the G1's Fortress model (xacro) and controllers
   scripts/transfer_scene.py     generates the world + scene YAML, laid out from the robot's chassis front
   scripts/transfer_demo.py      the sequence (extends moz1_sim_gazebo's jerrycan_demo.py)
+  scripts/reach_sweep.py        offline: which torso poses reach which pallet-A row / the box, and tip or not
 src/galbot_one_golf_description -> ../../galbot_g1/src/galbot_one_golf_description
 src/galbot_g1_moveit_config     -> ../../galbot_g1/src/galbot_g1_moveit_config
 ```
@@ -77,9 +78,9 @@ controllers (`<side>_arm_controller`, `<side>_gripper_controller`, a torso contr
 | chassis front / base_link height | 0.321 m / 0.105 m | 0.307 m / 0.032 m |
 | torso | 6 joints, placeholder 100 N·m | 5-joint leg, 280-420 N·m |
 | arm efforts | 50 N·m (URDF placeholder) | 180/180/60/60/30/30/30 N·m (Galbot's MuJoCo force ranges) |
-| pallet A row 5 | torso `reach70`/`reach80` (hips + waist forward) | leg `reach` (upper body 0.22 m forward, upright) or leans |
+| pallet A | 3 layers, row 5: torso `reach70`/`reach80` (hips + waist forward) | 4 layers, row 4 (handles 1.09 m up, 0.79 m out): leg `lean` — the highest and furthest it picks without tipping |
 | carry | `carry` (hips back): the loaded torso otherwise folds | standing |
-| pallet B box | `low_lean` crouch | `crouch` (upright, 0.25 m lower) |
+| pallet B box | on the deck: `low_lean` crouch | on the floor (no pallet B): `crouch` (upright, 0.25 m lower) |
 
 ### Results
 
@@ -127,5 +128,20 @@ controllers (`<side>_arm_controller`, `<side>_gripper_controller`, a torso contr
   (`grasp_z_offset`) to keep the fingertips off the can body; the gripper closes from 0
   (open, 124 mm) to 1.703, the other way round from the Moz1's stroke (`grasp_helper`
   takes the thresholds from the profile).
+- **It tips.** Galbot's model is 95 kg with only 23 kg in the chassis, and `leg_joint1`
+  swings 17 kg of leg forward; the wheels touch down at x = ±0.176 m. Leaning over
+  row 5 of a 4-layer stack (`reach_lean`, upper body fully forward) put the centre of
+  mass at x = 0.24 m: the robot tipped 4.4° onto its front wheels and slid 6 cm back,
+  and every move planned for a level base was off (the fingers clipped row 6). So
+  `reach_sweep.py` checks the centre of mass as well as reach (behind x = 0.15 m, the
+  cans in hand included), and the G1 picks row 4 with `lean` (0.138 m). Row 5 is in
+  reach but only tipping; a 5th layer is out of reach altogether.
+- **The lean over the stack is planned with the arms** (`torso_dual_arm`, a group added
+  to the SRDF for this): every IK solution for the pre-grasp was a ~200° swing from home
+  that ran a hand through a neighbouring can, and leaning with the arms at home drives
+  the hands into the 4-layer stack.
+- **Over the box the hands keep their grasp yaw** (`keep_grasp_yaw`): the handle is at
+  one end of the can, and the other yaw — a wrist half-turn — swung one filled can into
+  the other.
 - **Effort limits** are raised at launch to the actuator force ranges of Galbot's MuJoCo
   model, as `galbot_g1_gazebo` does (the URDF's are too weak to hold the leg up).

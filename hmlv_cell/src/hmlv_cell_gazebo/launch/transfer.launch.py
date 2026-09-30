@@ -20,10 +20,12 @@ to pallet B and places them on its deck, nearest row. See scripts/transfer_demo.
 
 Args:
   robot         moz1 (default) | g1
-  cleared_rows  top-layer rows of pallet A already taken (default 4, so the pair
-                comes from row 5 and the torso has to lean over the pallet)
-  layers        stack height on pallet A (default 3); the pair comes from its top
-                layer, the furthest row with nothing in front
+  cleared_rows  top-layer rows of pallet A already taken (default: the robot
+                profile's scene.cleared_rows, else 4 — the pair comes from row 5 and
+                the torso has to lean over the pallet)
+  layers        stack height on pallet A (default: scene.layers, else 3); the pair
+                comes from its top layer, the furthest row with nothing in front
+  The profile's scene.box_on_floor puts pallet B's box on the floor (no pallet B).
   demo          run the sequence (default true)
   speed         free-space velocity scaling (default 0.4)
   record        a directory: record the run there for the web replay
@@ -58,13 +60,17 @@ def launch_setup(context, *args, **kwargs):
     with open(robot_file) as f:
         profile = yaml.safe_load(f)
 
+    sc = profile["scene"]
+    cleared_rows = arg("cleared_rows") or str(sc.get("cleared_rows", 4))
+    layers = arg("layers") or str(sc.get("layers", 3))
     out_dir = f"/tmp/hmlv_transfer_{robot}"
     gen = os.path.join(get_package_prefix("hmlv_cell_gazebo"), "lib", "hmlv_cell_gazebo",
                        "transfer_scene.py")
     print(subprocess.check_output(
-        [gen, "--cleared-rows", arg("cleared_rows"), "--layers", arg("layers"),
-         "--base-front", str(profile["scene"]["base_front"]),
-         "--base-z", str(profile["scene"]["base_z"]), "--out-dir", out_dir], text=True).strip())
+        [gen, "--cleared-rows", cleared_rows, "--layers", layers,
+         "--base-front", str(sc["base_front"]), "--base-z", str(sc["base_z"]),
+         "--out-dir", out_dir] + (["--box-on-floor"] if sc.get("box_on_floor") else []),
+        text=True).strip())
     world = os.path.join(out_dir, "hmlv_transfer.world")
     scene_file = os.path.join(out_dir, "hmlv_transfer.yaml")
     with open(scene_file) as f:
@@ -140,10 +146,12 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("robot", default_value="moz1",
                               description="moz1 (Spirit AI Moz1) | g1 (Galbot G1)"),
-        DeclareLaunchArgument("cleared_rows", default_value="4",
-                              description="Top-layer rows of pallet A already taken."),
-        DeclareLaunchArgument("layers", default_value="3",
-                              description="Stack height on pallet A (pick from its top)."),
+        DeclareLaunchArgument("cleared_rows", default_value="",
+                              description="Top-layer rows of pallet A already taken "
+                                          "(default: the robot profile's)."),
+        DeclareLaunchArgument("layers", default_value="",
+                              description="Stack height on pallet A, pick from its top "
+                                          "(default: the robot profile's)."),
         DeclareLaunchArgument("demo", default_value="true"),
         DeclareLaunchArgument("speed", default_value="0.4"),
         DeclareLaunchArgument("gui", default_value="false",

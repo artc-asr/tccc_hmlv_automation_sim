@@ -26,6 +26,12 @@
         <joint name="leg_joint4"/>
         <joint name="leg_joint5"/>
     </group>
+    <!-- torso and both arms planned as one (the HMLV cell's lean over pallet A:
+         a torso-only or arms-only plan drives the hands into the stack) -->
+    <group name="torso_dual_arm">
+        <group name="torso"/>
+        <group name="dual_arm"/>
+    </group>
     <group name="head">
         <joint name="head_joint1"/>
         <joint name="head_joint2"/>
