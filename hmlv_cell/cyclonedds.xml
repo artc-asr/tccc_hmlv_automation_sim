@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Cyclone DDS for the HMLV cell (source_sim.sh): this machine only, over loopback
+     (no multicast: `lo` has none; peers by unicast), so a Wi-Fi address change
+     can't cut nodes off from each other. -->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain id="any">
+    <General>
+      <Interfaces><NetworkInterface name="lo"/></Interfaces>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+      <Peers><Peer address="localhost"/></Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

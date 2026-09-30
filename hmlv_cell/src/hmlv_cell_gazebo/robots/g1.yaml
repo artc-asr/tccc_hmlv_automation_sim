@@ -90,6 +90,10 @@ lean_retries: 6
 # was a ~200° swing through a neighbouring can), plan torso and arms together
 # around the stack with this SRDF group (galbot_g1_moveit_config).
 lean_group: torso_dual_arm
+# ... but first: arms to the pre-grasp with the torso upright, then the torso alone
+# leans (two direct moves, the same every run; the planned torso + arms path above
+# differed, and sometimes wound around, from run to run)
+lean_arms_first: true
 # Over the box the hands keep the grasp yaw they hold the filled cans with: the
 # handle is at one end of the can, and the other yaw (a wrist half-turn, 230° of
 # joint travel) swung one can into the other.

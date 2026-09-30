@@ -65,6 +65,16 @@ fi
 # Everything here is on this machine; set IGN_IP yourself to reach another one.
 export IGN_IP="${IGN_IP:-127.0.0.1}"
 
+# ROS 2 over Cyclone DDS (on loopback: cyclonedds.xml), not the default Fast DDS.
+# gz_ros2_control fetches robot_description from robot_state_publisher once, as a
+# service call, when a robot spawns; with Fast DDS the reply to that just-discovered
+# client was now and then dropped ("failed to send response ... (timeout)") and that
+# robot's controller manager never came up (the plugin waits forever, so even a
+# respawn could not recover) — about 1 launch in 4. Use the same in every terminal
+# that talks to the cell (source this file there too).
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export CYCLONEDDS_URI="${CYCLONEDDS_URI:-file://$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cyclonedds.xml}"
+
 unset _CELL_WS _CELL_BUILD _CELL_FLAGS _CELL_PKGS _a
 
 echo "✨ Ready.  Launch e.g.:"

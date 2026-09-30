@@ -485,7 +485,7 @@ class TransferDemo(JerrycanDemo):
         return (res.fraction >= 0.98 and self._jump(t) < MAX_JUMP and self._travel(t) < MAX_TRAVEL
                 and self._traj_ok(side, t))
 
-    def corridor_ik(self, side, anchor, reach, tries=12, quats=None):
+    def corridor_ik(self, side, anchor, reach, tries=12, quats=None, start=0):
         """IK for `anchor` (x, y, z) from which straight vertical lines to each z
         in `reach` are feasible — e.g. down to the handle and up to the lift
         height. KDL returns one configuration per seed and a long vertical line
@@ -496,10 +496,11 @@ class TransferDemo(JerrycanDemo):
         offsets from them, and only then anywhere in the joint range — a far
         seed tends to give a solution on the other elbow/wrist branch, which the
         arm then swings a long way round to reach. `quats`: the grasp
-        orientations to try (default: all of grasp_quats)."""
+        orientations to try (default: all of grasp_quats). `start` > 0 skips the
+        first seeds (the current joints): another, random, solution."""
         lim = self.arm_limits[side]
         now = [self.joints.get(j, 0.0) for j in self.arm_joints[side]]
-        for i in range(tries):
+        for i in range(start, tries):
             if i == 0:
                 seed = now
             elif i < tries // 2:
@@ -527,6 +528,31 @@ class TransferDemo(JerrycanDemo):
                 raise StepFailed(f"{side}_arm: no configuration covers the straight "
                                  f"moves {what}")
             sols[side], quats[side] = found
+        n = self.robot.get("corridor_retries", 0)
+        if n:
+            # the profile's corridor_retries: more configurations per arm, and a
+            # direct joint move to the pair of them that moves least, before any
+            # planning (with the Moz1's filled pair the first one needed a 143°
+            # swing that clipped the box wall, and the loaded arms could not track
+            # the planned detour: controller abort, arms left against the box)
+            now = {sd: [self.joints.get(j, 0.0) for j in self.arm_joints[sd]] for sd in SIDES}
+            cands = {}
+            for side in SIDES:
+                cands[side] = [(sols[side], quats[side])]
+                for _ in range(n):
+                    more = self.corridor_ik(side, anchors[side], reach[side], start=1,
+                                            quats=[keep[side]] if keep else None)
+                    if more and all(max(abs(a - b) for a, b in zip(more[0], c[0])) > 0.1
+                                    for c in cands[side]):
+                        cands[side].append(more)
+            combos = sorted(((l, r) for l in cands["left"] for r in cands["right"]),
+                            key=lambda c: max(abs(a - b) for sd, (j, _q) in zip(SIDES, c)
+                                              for a, b in zip(j, now[sd])))
+            for combo in combos[:8]:
+                if self._direct_joint({sd: (self.arm_joints[sd], j)
+                                       for sd, (j, _q) in zip(SIDES, combo)}, self.speed):
+                    self.settle("dual")
+                    return {sd: q for sd, (_j, q) in zip(SIDES, combo)}
         self.dual_joint_goal(sols, what)
         return quats
 
@@ -628,7 +654,14 @@ class TransferDemo(JerrycanDemo):
         another arm branch (a 210° swing that crossed the G1's grippers). If
         all collide and the profile names a lean_group (torso + both arms in the
         SRDF), the first solution is planned for with that group, around the
-        stack, before the torso-only fallback."""
+        stack, before the torso-only fallback.
+
+        With the profile's lean_arms_first, before all that: the arms straight to
+        the pre-grasp joints with the torso still upright (the big swing from home
+        to a top-down hand happens in free air in front of the chest), THEN the
+        torso alone leans and brings the hands over the pair — two direct moves,
+        the same every run, where OMPL's plan for torso + arms took a different
+        (sometimes winding) path each time."""
         torso = [math.radians(d) for d in self.presets[name]]
         cands = [arms]
         if poses is not None and self.robot.get("lean_retries"):
@@ -639,6 +672,19 @@ class TransferDemo(JerrycanDemo):
                     cands.append(found[0])
             cands[1:] = sorted(cands[1:], key=lambda a: max(
                 abs(x - y) for sd in SIDES for x, y in zip(a[sd], now[sd])))
+        if self.robot.get("lean_arms_first"):
+            for arms in cands:
+                if not self._direct_joint({sd: (self.arm_joints[sd], arms[sd]) for sd in SIDES},
+                                          self.speed):
+                    continue
+                self.settle("dual")
+                if self._direct_joint({"torso": (self.torso, torso)}, 0.5 * 0.3):
+                    self.settle("torso")
+                    self.get_logger().info(f"arms top-down, then torso → {name}: hands over "
+                                           f"the pair")
+                    return
+                self.get_logger().info("  arms top-down, but the lean from there collides")
+                break
         for arms in cands:
             goals = {"torso": (self.torso, torso)}
             goals.update({sd: (self.arm_joints[sd], arms[sd]) for sd in SIDES})

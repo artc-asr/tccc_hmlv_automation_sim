@@ -95,3 +95,8 @@ tuck_straight_only: true
 # G1's): with ik_filter the reach over the box once chose the other yaw, a wrist
 # half-turn (222° of joint travel) that swung one filled can into the other.
 keep_grasp_yaw: true
+# Moving over the box (and above any pick): a few more arm configurations per arm,
+# and the direct move that swings least, before planning. Once, the first one
+# needed a 143° swing that clipped the box wall, and the arms, holding 8.4 kg,
+# could not track the planned detour (controller abort, box out of reach).
+corridor_retries: 4

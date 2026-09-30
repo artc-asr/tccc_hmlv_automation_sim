@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <!-- ?v=: bump on every change to style.css / app.js, or browsers mix cached and new files -->
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
   <script type="importmap">
   {
     "imports": {
@@ -50,7 +50,7 @@
     <aside class="side">
       <h2 id="phases-title">States</h2>
       <ol id="phases" class="phases"></ol>
-      <h2>Demo log</h2>
+      <h2 id="log-title">Demo log</h2>
       <div id="log" class="log" aria-live="polite"></div>
     </aside>
 
@@ -74,6 +74,10 @@
     </aside>
   </main>
 
-  <script type="module" src="app.js?v=5"></script>
+  <footer id="logbar" class="logbar" hidden>
+    <h2>Demo log</h2>
+  </footer>
+
+  <script type="module" src="app.js?v=6"></script>
 </body>
 </html>

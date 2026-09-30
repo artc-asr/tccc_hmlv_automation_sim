@@ -50,6 +50,9 @@ class DuoRobot(TransferDemo):
         super().__init__()
         self.role = role
         self.event_pub = self.create_publisher(String, "duo_event", LATCHED)
+        # the supervisor's start signal, once both robots are ready
+        self.go = threading.Event()
+        self.create_subscription(Empty, "/duo/go", lambda _m: self.go.set(), LATCHED)
         # the cell is laid out from the G1's chassis front; this robot's stands this
         # much further back (the Moz1's: 14 mm), so it stops that much further back
         self.x_off = self.scene["base_front"] - self.robot["scene"]["base_front"]
@@ -73,6 +76,11 @@ class DuoRobot(TransferDemo):
     def run(self):
         self.startup()
         self.setup_scene()
+        # both robots start together: the robots come up one after the other
+        # (duo.launch.py), so wait for the supervisor's go
+        self.event("ready")
+        while not self.go.wait(timeout=5.0):
+            self.get_logger().info("  ... waiting for the other robot (duo/go)")
         s = self.scene
         if self.role == "g1":
             self.phase("pick_a")
@@ -107,6 +115,7 @@ class Supervisor(Node):
             self.create_subscription(String, f"/{r}/duo_event",
                                      lambda m, r=r: self._on_event(r, m.data), LATCHED)
         self.phase_pub = self.create_publisher(String, "/duo/phase", LATCHED)
+        self.go_pub = self.create_publisher(Empty, "/duo/go", LATCHED)
         self.conveyor_start = self.create_publisher(Empty, "/conveyor/start", 10)
         # the filled pair's new colour for RViz and the recording (the belt recolours
         # it in Gazebo itself; the web replay only sees these)
@@ -172,6 +181,9 @@ class Supervisor(Node):
     def run(self):
         self.get_logger().info("duo line: G1 pallet A -> belt, Moz1 belt -> pallet B, "
                                "concurrently; then the belt fills and indexes")
+        self.wait_all("ready", 600.0)
+        self.get_logger().info("both robots ready: go")
+        self.go_pub.publish(Empty())
         self.phase_pub.publish(String(data="cycle"))
         self.wait_all("placed", 900.0)
         self.get_logger().info("both pairs placed: belt fills the middle pair and indexes")

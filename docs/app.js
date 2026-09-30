@@ -450,6 +450,10 @@ if ([1, 2, 4, 8].includes(askedSpeed)) {
       $("side-right").hidden = false;
       $("linebar").hidden = false;
       $("follow").hidden = true;
+      // the log as a strip along the bottom (the side panels hold the states)
+      $("log-title").hidden = true;
+      $("logbar").hidden = false;
+      $("logbar").appendChild($("log"));
       groups = [{ ...left, list: $("phases") }, { ...right, list: $("phases2") },
                 { ...line, list: $("linebar"), bar: true, row: true }];
     } else {
