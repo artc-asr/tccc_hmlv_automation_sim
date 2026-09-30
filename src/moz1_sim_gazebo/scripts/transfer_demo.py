@@ -39,6 +39,7 @@ from nav_msgs.msg import Odometry
 from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
 from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from std_msgs.msg import Empty, String
 
 from jerrycan_demo import (FRAME, GRASP_QUATS, GRIPPER_APPROACH, GRIPPER_CLOSED,
@@ -64,8 +65,15 @@ TORSO_PRESETS = {
     "deep": [0, 85, -145, 75, 0, 0],
     "low_lean": [0, 90, -150, 80, 0, 0],
     "carry": [0, 50, -100, 40, 0, 0],
+    # far reach: hips forward as well as the waist. Pallet A's 5th row on the
+    # lower level (handles 0.93 m out, 0.51 m up in base_link) is out of reach
+    # for every pose above; an IK sweep (hip 60-90, knee -60..-145, waist 70/80)
+    # reaches it with these two and their neighbours.
+    "reach70": [0, 70, -90, 70, 0, 0],
+    "reach80": [0, 80, -90, 80, 0, 0],
 }
-PICK_TORSOS = ["home", "lean45", "lean60", "lean75"]      # least lean first
+# least lean first; the crouches last, for a low stack (--layers 2: handles at 0.62 m)
+PICK_TORSOS = ["home", "lean45", "lean60", "lean75", "reach70", "reach80", "deep", "low_lean"]
 # Placing on the deck, loaded. Not "deep": with 8.4 kg in hand the arms can't hold
 # the planned path in that crouch (they sag, the controller aborts) and the held
 # cans are driven down through the pallet deck before it gives up; low_lean has
@@ -75,6 +83,12 @@ DECK_TORSOS = ["low_lean", "lean75"]
 # chest by the first of these that plans (straight line or free space, the held
 # cans collision-checked against the body). Height and hand spacing are kept.
 TUCK_IN = [0.20, 0.15, 0.10, 0.05]     # m, toward the robot
+MAX_JUMP = 0.35     # rad per 5 mm straight-line step; more = an IK branch flip (see _jump)
+# Total travel of any one joint along a straight-line move. Holding the top-down
+# hand orientation along a line near full reach (backing out of pallet A's 5th
+# row) takes the wrist through a singularity: a valid but huge, slow swing (2-4
+# rad of wrist over 0.4 m, a 50 s trajectory). Such moves go joint-space instead.
+MAX_TRAVEL = 1.5    # rad
 ARM_JOINTS = {s: [f"{s.capitalize()}Arm-{i}" for i in range(7)] for s in SIDES}
 
 
@@ -90,6 +104,10 @@ class TransferDemo(JerrycanDemo):
                                         f"/{s}_arm_controller/follow_joint_trajectory")
                         for s in SIDES}
         self.conveyor_start = self.create_publisher(Empty, "/conveyor/start", 10)
+        # direct joint-space moves (see _direct_joint), per controller
+        self.fjt = dict(self.arm_fjt, torso=ActionClient(
+            self, FollowJointTrajectory, "/torso_controller/follow_joint_trajectory"))
+        self.recolor_pub = self.create_publisher(String, "/scene_markers/recolor", 10)
         self.conveyor_done = threading.Event()
         self.create_subscription(Empty, "/conveyor/done",
                                  lambda _m: self.conveyor_done.set(), 10)
@@ -279,12 +297,17 @@ class TransferDemo(JerrycanDemo):
                 return [sol[j] for j in ARM_JOINTS[side]]
         return None
 
-    def dual_ik(self, poses, torso=None):
-        """IK for both arms; tries the two top-down grasp yaws per arm. Returns
-        ({side: joints}, {side: quat}) or None."""
+    def dual_ik(self, poses, torso=None, prefer=None):
+        """IK for both arms; tries the two top-down grasp yaws per arm, `prefer`
+        ({side: quat}, the hand's current one) first — the other yaw is a
+        half-turn of the wrist, and a joint move there twirls a held can.
+        Returns ({side: joints}, {side: quat}) or None."""
         sols, quats = {}, {}
         for side in SIDES:
-            for q in GRASP_QUATS:
+            order = GRASP_QUATS
+            if prefer and side in prefer:
+                order = [prefer[side]] + [g for g in GRASP_QUATS if g != prefer[side]]
+            for q in order:
                 p = poses[side]
                 j = self.solve_ik(side, _pose(p[0], p[1], p[2], q), torso)
                 if j is not None:
@@ -293,6 +316,24 @@ class TransferDemo(JerrycanDemo):
             else:
                 return None
         return sols, quats
+
+    @staticmethod
+    def _jump(traj):
+        """Largest single-joint change between consecutive points (rad). The
+        paths are sampled every 5 mm, so a big one is the IK flipping to another
+        elbow/wrist branch mid-line — executed, that's the arm swinging wildly
+        around (and then stuck, holding a can against something)."""
+        pts = traj.points
+        return max((abs(b - a) for p, q in zip(pts, pts[1:])
+                    for a, b in zip(p.positions, q.positions)), default=0.0)
+
+    @staticmethod
+    def _travel(traj):
+        """Largest total path length of any one joint along the trajectory (rad)."""
+        pts = traj.points
+        n = len(pts[0].positions) if pts else 0
+        return max((sum(abs(q.positions[k] - p.positions[k]) for p, q in zip(pts, pts[1:]))
+                    for k in range(n)), default=0.0)
 
     def _cartesian_ok(self, side, start_joints, pose):
         """Is a straight tcp line from `start_joints` to `pose` fully feasible?"""
@@ -309,20 +350,33 @@ class TransferDemo(JerrycanDemo):
         # motion when it runs (dual_straight), not with the other arm frozen
         req.avoid_collisions = False
         res = self._wait(self.cartesian.call_async(req), 20.0, "compute_cartesian_path")
-        return res.fraction >= 0.98
+        t = res.solution.joint_trajectory
+        return res.fraction >= 0.98 and self._jump(t) < MAX_JUMP and self._travel(t) < MAX_TRAVEL
 
     def corridor_ik(self, side, anchor, reach, tries=12):
         """IK for `anchor` (x, y, z) from which straight vertical lines to each z
         in `reach` are feasible — e.g. down to the handle and up to the lift
         height. KDL returns one configuration per seed and a long vertical line
         can run one elbow configuration into a joint limit halfway, so sample
-        seeds until a configuration covers the whole corridor."""
+        seeds until a configuration covers the whole corridor.
+
+        Seeds nearest first: the arm's current joints, then small random
+        offsets from them, and only then anywhere in the joint range — a far
+        seed tends to give a solution on the other elbow/wrist branch, which the
+        arm then swings a long way round to reach."""
         lim = {"left": [(-3.14, 2.09), (-2.96, 0.15), (-3.05, 3.05), (-2.25, 0.17),
                         (-3.05, 3.05), (-1.65, 1.65), (-1.57, 1.57)],
                "right": [(-2.09, 3.14), (-2.96, 0.15), (-3.05, 3.05), (-0.17, 2.25),
                          (-3.05, 3.05), (-1.65, 1.65), (-1.57, 1.57)]}[side]
+        now = [self.joints.get(j, 0.0) for j in ARM_JOINTS[side]]
         for i in range(tries):
-            seed = None if i == 0 else [random.uniform(a, b) for a, b in lim]
+            if i == 0:
+                seed = now
+            elif i < tries // 2:
+                seed = [min(b, max(a, v + random.gauss(0.0, 0.3 * i)))
+                        for v, (a, b) in zip(now, lim)]
+            else:
+                seed = [random.uniform(a, b) for a, b in lim]
             for q in GRASP_QUATS:
                 j = self.solve_ik(side, _pose(*anchor, q), attempts=1, seed=seed)
                 if j is not None and all(
@@ -344,7 +398,52 @@ class TransferDemo(JerrycanDemo):
         self.dual_joint_goal(sols, what)
         return quats
 
+    def _direct_joint(self, goals, vmax, samples=20):
+        """Straight to `goals` ({controller: (joint names, positions)}) in joint
+        space, if that line is collision-free with everything moving together:
+        one smooth two-point trajectory per controller (the least joint motion
+        there is), no planner detours. Returns False, having moved nothing, if
+        the line collides. `vmax`: peak joint speed (rad/s)."""
+        start = {k: [self.joints.get(j, 0.0) for j in names] for k, (names, _) in goals.items()}
+        names = [j for k in goals for j in goals[k][0]]
+        for i in range(samples + 1):
+            f = i / samples
+            req = GetStateValidity.Request(group_name="dual_arm")
+            req.robot_state = RobotState(is_diff=True)
+            req.robot_state.joint_state.name = names
+            req.robot_state.joint_state.position = [
+                a + (b - a) * f for k in goals for a, b in zip(start[k], goals[k][1])]
+            res = self._wait(self.validity.call_async(req), 10.0, "check_state_validity")
+            if not res.valid:
+                c = res.contacts[0] if res.contacts else None
+                big = max(abs(b - a) for k in goals for a, b in zip(start[k], goals[k][1]))
+                self.get_logger().info(
+                    f"  direct joint move ({math.degrees(big):.0f}° max) collides at {f:.0%}: "
+                    f"{(c.contact_body_1 + ' / ' + c.contact_body_2) if c else 'invalid state'}")
+                return False
+        delta = max(abs(b - a) for k in goals for a, b in zip(start[k], goals[k][1]))
+        dur = max(1.0, 1.5 * delta / vmax)      # cubic, zero end velocities: peak 1.5x mean
+        handles = {}
+        for k, (jn, goal) in goals.items():
+            t = JointTrajectory(joint_names=jn)
+            end = JointTrajectoryPoint(positions=list(goal), velocities=[0.0] * len(jn))
+            end.time_from_start = Duration(sec=int(dur), nanosec=int((dur % 1) * 1e9))
+            t.points = [JointTrajectoryPoint(positions=start[k], velocities=[0.0] * len(jn)), end]
+            handles[k] = self._wait(self.fjt[k].send_goal_async(
+                FollowJointTrajectory.Goal(trajectory=t)), 10.0, f"{k} (accept)")
+        for k, h in handles.items():
+            if not h.accepted:
+                raise StepFailed(f"{k}: trajectory rejected")
+            res = self._wait(h.get_result_async(), dur + 30.0, k).result
+            if res.error_code != 0:
+                raise StepFailed(f"{k}: controller error {res.error_code}")
+        return True
+
     def dual_joint_goal(self, sols, what):
+        if self._direct_joint({sd: (ARM_JOINTS[sd], sols[sd]) for sd in SIDES}, self.speed):
+            self.settle("dual")
+            return
+        self.get_logger().info(f"  planning {what} around the obstacle instead")
         c = Constraints()
         c.joint_constraints = [
             JointConstraint(joint_name=n, position=v, tolerance_above=0.005,
@@ -354,7 +453,27 @@ class TransferDemo(JerrycanDemo):
         if code != MoveItErrorCodes.SUCCESS:
             raise StepFailed(f"dual_arm: no plan {what} (code {code})")
 
+    def lean_to(self, name, arms):
+        """Torso to preset `name` and both arms to `arms` (the pre-grasp joints
+        for that torso) in ONE direct move. Leaning with the arms still at home
+        drives the hands into the stack for the far rows; this goes straight to
+        a pose the reach check already found collision-free. Falls back to torso
+        first, then arms."""
+        goals = {"torso": (TORSO, [math.radians(d) for d in TORSO_PRESETS[name]])}
+        goals.update({sd: (ARM_JOINTS[sd], arms[sd]) for sd in SIDES})
+        if self._direct_joint(goals, 0.5 * 0.3):
+            self.settle("torso")
+            self.settle("dual")
+            self.get_logger().info(f"torso → {name}, hands over the pair")
+            return
+        self.torso_to(name)
+
     def torso_to(self, name):
+        goal = [math.radians(d) for d in TORSO_PRESETS[name]]
+        if self._direct_joint({"torso": (TORSO, goal)}, 0.5 * 0.3):
+            self.settle("torso")
+            self.get_logger().info(f"torso → {name}")
+            return
         c = Constraints()
         c.joint_constraints = [
             JointConstraint(joint_name=n, position=math.radians(d), tolerance_above=0.005,
@@ -382,6 +501,14 @@ class TransferDemo(JerrycanDemo):
             res = self._wait(self.cartesian.call_async(req), 20.0, "compute_cartesian_path")
             if res.fraction < 0.98:
                 raise StepFailed(f"{side}_arm: straight move only {res.fraction:.0%} feasible")
+            jump = self._jump(res.solution.joint_trajectory)
+            if jump >= MAX_JUMP:
+                raise StepFailed(f"{side}_arm: straight move flips configuration "
+                                 f"({math.degrees(jump):.0f}° in one 5 mm step)")
+            travel = self._travel(res.solution.joint_trajectory)
+            if travel >= MAX_TRAVEL:
+                raise StepFailed(f"{side}_arm: straight move swings a joint "
+                                 f"{math.degrees(travel):.0f}° (wrist singularity)")
             trajs[side] = res.solution.joint_trajectory
         return trajs
 
@@ -444,7 +571,7 @@ class TransferDemo(JerrycanDemo):
             return quats
         except StepFailed as exc:
             self.get_logger().info(f"{exc} — planning {what} in free space instead")
-        found = self.dual_ik(poses)
+        found = self.dual_ik(poses, prefer=quats)
         if found is None:
             raise StepFailed(f"no IK for {what}")
         sols, q = found
@@ -478,7 +605,8 @@ class TransferDemo(JerrycanDemo):
 
     def select_pick(self):
         """Top layer, first remaining row (nothing in front), innermost pair both
-        arms reach, with the least torso lean. Returns ({side: target}, preset)."""
+        arms reach, with the least torso lean. Returns ({side: target}, preset,
+        {side: arm joints at the pre-grasp pose with that torso})."""
         by_side = {s: sorted([t for t in self.scene["targets"] if t["side"] == s],
                              key=lambda t: abs(t["pos"][1])) for s in SIDES}
         row = self.scene["cleared_rows"] + 1
@@ -490,18 +618,18 @@ class TransferDemo(JerrycanDemo):
             pair = {"left": by_side["left"][li], "right": by_side["right"][ri]}
             for preset in PICK_TORSOS:
                 torso = TORSO_PRESETS[preset]
-                ok = True
+                found = []
                 for dz in (PRE_GRASP, 0.0):
                     poses = {s: tuple(v + (dz if k == 2 else 0) for k, v in
                                       enumerate(self.grasp_pose(pair[s]["pos"]))) for s in SIDES}
-                    if self.dual_ik(poses, torso) is None:
-                        ok = False
+                    found.append(self.dual_ik(poses, torso))
+                    if found[-1] is None:
                         break
-                if ok:
+                if found[-1] is not None:
                     self.get_logger().info(
                         f"picking {pair['left']['name']} (left) + {pair['right']['name']} "
                         f"(right), torso '{preset}'")
-                    return pair, preset
+                    return pair, preset, found[0][0]
         raise StepFailed("no pair on pallet A is reachable by both arms")
 
     def pick_pair(self, names, bottoms, lift_to, where):
@@ -624,7 +752,7 @@ class TransferDemo(JerrycanDemo):
         self.dual_gripper(GRIPPER_APPROACH)
 
         # --- pallet A: pick the empty pair
-        pair, preset = self.select_pick()
+        pair, preset, pre_arms = self.select_pick()
         names = {s_: pair[s_]["name"] for s_ in SIDES}
         # the cans left behind: full height again (handles included), so nothing
         # carried is routed through them
@@ -634,7 +762,7 @@ class TransferDemo(JerrycanDemo):
         self.refresh_scene()
         bottoms = {s_: self.locate(names[s_], pair[s_]["pos"]) for s_ in SIDES}
         if preset != "home":
-            self.torso_to(preset)
+            self.lean_to(preset, pre_arms)
         # Lift just clear of the layer underneath, then slide straight back toward
         # the robot: the row's other cans are beside the pair (4 mm gaps, no
         # overlap across the row) and the rows in front are already empty. A high
@@ -648,9 +776,16 @@ class TransferDemo(JerrycanDemo):
         # carry pose: hands over where the belt slots will be, relative to the base
         carry = {s_: self.grasp_pose([load[s_][0], load[s_][1] - st["load"][1] + st["A"][1], top])
                  for s_ in SIDES}
+        # Out of the row: a short straight pull clear of the row's other cans (4 mm
+        # beside the pair), then the torso straight back up with the arms as they
+        # are — the cans rise and come back with the chest. Folding the arms in
+        # while still leaning is what swung the wrists: at this reach a straight
+        # line back takes the wrist through its singularity (2-4 rad of swing),
+        # and a joint move there turns the hanging can into its neighbour.
         now = {s_: self.tcp_now(s_) for s_ in SIDES}
-        quats = self.dual_move_to({s_: (carry[s_][0], now[s_][1], now[s_][2]) for s_ in SIDES},
-                                  quats, "back out of the row")
+        clear = s["container"]["W"] + 0.03
+        self.dual_straight({s_: (now[s_][0] - clear, now[s_][1], now[s_][2]) for s_ in SIDES},
+                           quats, 0.1)
         if preset != "home":
             self.torso_to("home")
 
@@ -670,7 +805,9 @@ class TransferDemo(JerrycanDemo):
         for s_ in SIDES:        # where the belt put them; bodies only, as pick targets
             self.objects[names[s_]] = ("can", unload[s_], True)
         self.refresh_scene()
-        self.get_logger().info(f"delivered and filled: {s['filled_mass']} kg each")
+        for s_ in SIDES:        # Gazebo recolours them itself; RViz draws the world file
+            self.recolor_pub.publish(String(data=f"{names[s_]} {s['filled_rgba']}"))
+        self.get_logger().info(f"delivered and filled: {s['filled_mass']} kg each (now red)")
 
         # --- unload station: pick the filled pair
         self.drive_to(*st["unload"], "conveyor unload")
@@ -693,12 +830,26 @@ class TransferDemo(JerrycanDemo):
         slots = s["b_slots"]
         deck = {s_: (slots[s_][0], slots[s_][1], slots[s_][2] + 0.003) for s_ in SIDES}
         quats = None
-        for preset in DECK_TORSOS:
-            torso = TORSO_PRESETS[preset]
-            if not all(self.dual_ik({s_: tuple(v + (dz if k == 2 else 0) for k, v in
+        def reachable(torso):
+            return all(self.dual_ik({s_: tuple(v + (dz if k == 2 else 0) for k, v in
                                                enumerate(self.grasp_pose(deck[s_])))
                                      for s_ in SIDES}, torso) is not None
-                       for dz in (PRE_GRASP, 0.0)):
+                       for dz in (PRE_GRASP, 0.0))
+
+        # Straight after the drive the reach check has failed in ~1 s for every
+        # pose that passes moments later: let the base and the loaded torso settle
+        # and re-check before giving up on a pose.
+        self.settle("torso")
+        for preset in DECK_TORSOS:
+            torso = TORSO_PRESETS[preset]
+            for attempt in range(3):
+                if reachable(torso):
+                    break
+                self.get_logger().info(f"  box not reachable with torso '{preset}' "
+                                       f"(check {attempt + 1}/3)")
+                time.sleep(1.0)
+                self.refresh_scene()
+            else:
                 continue
             self.get_logger().info(f"pallet B box: torso '{preset}', arms curled")
             try:

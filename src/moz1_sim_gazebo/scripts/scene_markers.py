@@ -16,6 +16,10 @@ published at their INITIAL world poses, except those whose name starts with the
 `tf_model_prefix` parameter and aren't <static>: they are drawn in a TF frame named
 after the model, so they follow the live simulation when something broadcasts that
 frame (gz_pose_tf, as the jerry-can launch does). Empty prefix (default) = everything static, as before.
+
+Colours come from the world file, so a colour Gazebo changes at runtime doesn't
+show here: publish "<model> r g b a" (std_msgs/String) on /scene_markers/recolor
+to recolour a model's markers (visuals whose name contains "cap" are kept).
 """
 import math
 import xml.etree.ElementTree as ET
@@ -24,7 +28,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from geometry_msgs.msg import Quaternion
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA, String
 from visualization_msgs.msg import Marker, MarkerArray
 
 
@@ -91,11 +95,27 @@ class SceneMarkers(Node):
         self.tf_prefix = self.declare_parameter("tf_model_prefix", "").value
         qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self.pub = self.create_publisher(MarkerArray, "/scene_markers", qos)
+        self.visual_names = {}          # marker id -> its <visual> name
         self.markers = self._build()
+        self.create_subscription(String, "/scene_markers/recolor", self._on_recolor, 10)
         self.get_logger().info(
             f"publishing {len(self.markers.markers)} scene marker(s) from "
             f"{self.world_file} in frame '{self.frame_id}'")
         self.create_timer(2.0, lambda: self.pub.publish(self.markers))
+        self.pub.publish(self.markers)
+
+    def _on_recolor(self, msg):
+        parts = msg.data.split()
+        if len(parts) != 5:
+            self.get_logger().warn(f"recolor: expected '<model> r g b a', got '{msg.data}'")
+            return
+        name, (r, g, b, a) = parts[0], (float(v) for v in parts[1:])
+        n = 0
+        for m in self.markers.markers:
+            if m.ns == name and "cap" not in self.visual_names.get(m.id, ""):
+                m.color = ColorRGBA(r=r, g=g, b=b, a=a)
+                n += 1
+        self.get_logger().info(f"recoloured {n} marker(s) of {name}")
         self.pub.publish(self.markers)
 
     @staticmethod
@@ -151,6 +171,7 @@ class SceneMarkers(Node):
                     m.frame_locked = live
                     m.ns = name
                     m.id = mid
+                    self.visual_names[mid] = vis.get("name", "")
                     arr.markers.append(m)
                     mid += 1
         return arr

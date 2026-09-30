@@ -8,7 +8,7 @@ Writes a gz-sim world (SDF) and a scene YAML for scripts/transfer_demo.py:
 Layout (gz world frame; the robot starts at the origin facing +x, base FREE and
 driving along y, always in front of the pallets and the conveyor):
 
-    pallet A   y ≈ 0      4 L jerry cans, EMPTY (0.2 kg), 3 layers. The top
+    pallet A   y ≈ 0      4 L jerry cans, EMPTY (0.2 kg), 3 layers (--layers). The top
                           layer's first --cleared-rows rows are already gone, so
                           the next row can only be reached by leaning the torso
                           over the pallet.
@@ -34,7 +34,7 @@ import yaml
 from jerrycan_scene import (BAR_H, BASE_FRONT, CAN_GAP, CAP_RGBA, CONTAINERS, HANDLE_H,
                             PALLET, _box_geom, _can_geometry, _f, _mat, pallet_model)
 
-LAYERS = 3
+LAYERS = 3                 # stack height on pallet A
 EMPTY_MASS = 0.2           # TCCC 4 L can, empty (estimate on the reach page)
 FILLED_MASS = 4.2          # + 4 L of water
 CONVEYOR = {"x_min": 0.37, "x_max": 0.71, "y_min": 0.85, "y_max": 4.05, "top": 0.65}
@@ -51,7 +51,7 @@ BOX = {"margin": 0.025,    # can to inner wall, each side (placement slack)
 CARDBOARD_RGBA = "0.80 0.64 0.42 1"
 
 
-def build_scene(cleared_rows=2):
+def build_scene(cleared_rows=2, layers=LAYERS):
     c = CONTAINERS["4"]
     h, L, W = c["h"] / 1000, c["L"] / 1000, c["W"] / 1000
     bar_len = min(0.11, L - 0.09)
@@ -70,9 +70,9 @@ def build_scene(cleared_rows=2):
     def row_x(ri):
         return x0 + CAN_GAP / 2 + W / 2 + ri * (W + CAN_GAP)
 
-    top = LAYERS - 1
+    top = layers - 1
     static_cans, targets = [], []
-    for k in range(LAYERS):
+    for k in range(layers):
         for ri in range(rows):
             if k == top and ri < cleared_rows:
                 continue                                   # already taken
@@ -84,8 +84,8 @@ def build_scene(cleared_rows=2):
                 else:
                     static_cans.append(pos)
 
-    stack_top = deck + LAYERS * h
-    lower_top = deck + (LAYERS - 1) * h
+    stack_top = deck + layers * h
+    lower_top = deck + (layers - 1) * h
     cv = CONVEYOR
     boxes = [
         {"name": "pallet_a", "center": [x0 + PALLET["depth"] / 2, 0.0, deck / 2],
@@ -119,7 +119,7 @@ def build_scene(cleared_rows=2):
         "container": dict(c, key="4", h=h, L=L, W=W),
         "can": can,
         "empty_mass": EMPTY_MASS, "filled_mass": FILLED_MASS,
-        "layers": LAYERS, "rows": rows, "cols": cols, "cleared_rows": cleared_rows,
+        "layers": layers, "rows": rows, "cols": cols, "cleared_rows": cleared_rows,
         "stack_top": stack_top,
         "stations": {k: [0.0, v] for k, v in STATIONS.items()},
         "belt_offset": BELT_OFFSET,
@@ -305,10 +305,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--cleared-rows", type=int, default=2,
                     help="top-layer rows of pallet A already taken (default 2)")
+    ap.add_argument("--layers", type=int, default=LAYERS,
+                    help=f"stack height on pallet A; the pair comes from the top one "
+                         f"(default {LAYERS})")
     ap.add_argument("--out-dir", default=".")
     ap.add_argument("--name", default="moz1_transfer")
     a = ap.parse_args()
-    s = build_scene(a.cleared_rows)
+    s = build_scene(a.cleared_rows, a.layers)
     os.makedirs(a.out_dir, exist_ok=True)
     world = os.path.join(a.out_dir, f"{a.name}.world")
     with open(world, "w") as f:

@@ -14,8 +14,10 @@ to pallet B and places them on its deck, nearest row. See scripts/transfer_demo.
   3. RViz is the view (Gazebo headless unless gui:=true), like the jerry-can demo.
 
 Args:
-  cleared_rows  top-layer rows of pallet A already taken (default 2, so the pair
-                comes from row 3 and the torso has to lean over the pallet)
+  cleared_rows  top-layer rows of pallet A already taken (default 4, so the pair
+                comes from row 5 and the torso has to lean over the pallet)
+  layers        stack height on pallet A (default 3); the pair comes from its top
+                layer, the furthest row with nothing in front
   demo          run the sequence (default true)
   speed         free-space velocity scaling (default 0.4)
   gui, rviz, spawn_delay
@@ -42,7 +44,8 @@ def launch_setup(context, *args, **kwargs):
     gen = os.path.join(get_package_prefix("moz1_sim_gazebo"), "lib", "moz1_sim_gazebo",
                        "transfer_scene.py")
     print(subprocess.check_output(
-        [gen, "--cleared-rows", arg("cleared_rows"), "--out-dir", out_dir], text=True).strip())
+        [gen, "--cleared-rows", arg("cleared_rows"), "--layers", arg("layers"),
+         "--out-dir", out_dir], text=True).strip())
     world = os.path.join(out_dir, "moz1_transfer.world")
     scene_file = os.path.join(out_dir, "moz1_transfer.yaml")
     with open(scene_file) as f:
@@ -106,8 +109,10 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        DeclareLaunchArgument("cleared_rows", default_value="2",
+        DeclareLaunchArgument("cleared_rows", default_value="4",
                               description="Top-layer rows of pallet A already taken."),
+        DeclareLaunchArgument("layers", default_value="3",
+                              description="Stack height on pallet A (pick from its top)."),
         DeclareLaunchArgument("demo", default_value="true"),
         DeclareLaunchArgument("speed", default_value="0.4"),
         DeclareLaunchArgument("gui", default_value="false",
