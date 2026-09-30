@@ -147,7 +147,8 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        node.cmd_vel.publish(Twist())
+        if rclpy.ok():      # Ctrl-C has already shut the context down
+            node.cmd_vel.publish(Twist())
         node.destroy_node()
         rclpy.try_shutdown()
 
