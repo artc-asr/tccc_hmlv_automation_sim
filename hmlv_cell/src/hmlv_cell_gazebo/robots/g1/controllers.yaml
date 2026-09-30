@@ -1,0 +1,75 @@
+# ros2_control controllers for the Galbot G1 in the Fortress transfer cell.
+# Names match galbot_g1_moveit_config (leg_controller = the torso). Unlike
+# galbot_g1_gazebo (Harmonic), the grippers are FollowJointTrajectory controllers,
+# the interface the transfer demo commands on both robots.
+controller_manager:
+  ros__parameters:
+    update_rate: 250  # Hz, = the cell's 4 ms physics step
+    use_sim_time: true
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    leg_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    head_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    left_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    right_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    left_gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    right_gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+# Actuated joints only: gz_ros2_control reports the gripper linkage (mimic) joints
+# as "<name>_mimic", which robot_state_publisher would not know; it computes them
+# from the URDF <mimic> tags instead.
+joint_state_broadcaster:
+  ros__parameters:
+    joints: [leg_joint1, leg_joint2, leg_joint3, leg_joint4, leg_joint5, head_joint1, head_joint2, left_arm_joint1, left_arm_joint2, left_arm_joint3, left_arm_joint4, left_arm_joint5, left_arm_joint6, left_arm_joint7, right_arm_joint1, right_arm_joint2, right_arm_joint3, right_arm_joint4, right_arm_joint5, right_arm_joint6, right_arm_joint7, left_gripper_joint, right_gripper_joint]
+    interfaces: [position, velocity]
+
+# Holds the upper body: without an active controller the leg folds.
+leg_controller:
+  ros__parameters:
+    joints: [leg_joint1, leg_joint2, leg_joint3, leg_joint4, leg_joint5]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+head_controller:
+  ros__parameters:
+    joints: [head_joint1, head_joint2]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+left_arm_controller:
+  ros__parameters:
+    joints: [left_arm_joint1, left_arm_joint2, left_arm_joint3, left_arm_joint4, left_arm_joint5, left_arm_joint6, left_arm_joint7]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+right_arm_controller:
+  ros__parameters:
+    joints: [right_arm_joint1, right_arm_joint2, right_arm_joint3, right_arm_joint4, right_arm_joint5, right_arm_joint6, right_arm_joint7]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+# 0 open .. 1.703 closed (rad)
+left_gripper_controller:
+  ros__parameters:
+    joints: [left_gripper_joint]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true
+
+right_gripper_controller:
+  ros__parameters:
+    joints: [right_gripper_joint]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_nonzero_velocity_at_trajectory_end: true

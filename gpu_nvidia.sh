@@ -12,8 +12,8 @@
 #            i.e. gpu_lidar + cameras -- what navigation/SLAM needs.
 #
 # USAGE (this shell + everything it launches):
-#   source gpu_nvidia.sh            # or: source source_sim.sh gpu
-#   ros2 launch moz1_sim_gazebo sim_gazebo.launch.py            # GUI + lidar now work
+#   source gpu_nvidia.sh            # or: source <robot>/source_sim.sh gpu, ./sim.sh <robot> gpu
+#   ros2 launch ...                 # gz GUI + gpu sensors now render on NVIDIA
 #
 # Only affects the current shell; open a normal shell to go back to the iGPU.
 # Not sourced automatically -- it's laptop-specific, opt-in via the `gpu` flag.

@@ -1,0 +1,127 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 250  # Hz (physics runs at 500 Hz, 2 ms step)
+    use_sim_time: true
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    leg_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    head_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    left_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    right_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    left_gripper_controller:
+      type: position_controllers/GripperActionController
+    right_gripper_controller:
+      type: position_controllers/GripperActionController
+
+# Only actuated joints: gz_ros2_control reports mimic joints as "<name>_mimic", which
+# robot_state_publisher would not recognise. It derives the gripper linkage from the
+# URDF <mimic> tags instead.
+joint_state_broadcaster:
+  ros__parameters:
+    joints:
+      - leg_joint1
+      - leg_joint2
+      - leg_joint3
+      - leg_joint4
+      - leg_joint5
+      - head_joint1
+      - head_joint2
+      - left_arm_joint1
+      - left_arm_joint2
+      - left_arm_joint3
+      - left_arm_joint4
+      - left_arm_joint5
+      - left_arm_joint6
+      - left_arm_joint7
+      - right_arm_joint1
+      - right_arm_joint2
+      - right_arm_joint3
+      - right_arm_joint4
+      - right_arm_joint5
+      - right_arm_joint6
+      - right_arm_joint7
+      - left_gripper_joint
+      - right_gripper_joint
+    interfaces: [position, velocity]
+
+leg_controller:
+  ros__parameters:
+    joints: [leg_joint1, leg_joint2, leg_joint3, leg_joint4, leg_joint5]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_partial_joints_goal: true
+    open_loop_control: false
+    constraints:
+      stopped_velocity_tolerance: 0.05
+      goal_time: 1.0
+      leg_joint1: {goal: 0.05}
+      leg_joint2: {goal: 0.05}
+      leg_joint3: {goal: 0.05}
+      leg_joint4: {goal: 0.05}
+      leg_joint5: {goal: 0.05}
+
+head_controller:
+  ros__parameters:
+    joints: [head_joint1, head_joint2]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_partial_joints_goal: true
+    constraints:
+      stopped_velocity_tolerance: 0.05
+      goal_time: 1.0
+
+left_arm_controller:
+  ros__parameters:
+    joints:
+      - left_arm_joint1
+      - left_arm_joint2
+      - left_arm_joint3
+      - left_arm_joint4
+      - left_arm_joint5
+      - left_arm_joint6
+      - left_arm_joint7
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_partial_joints_goal: true
+    constraints:
+      stopped_velocity_tolerance: 0.05
+      goal_time: 1.0
+
+right_arm_controller:
+  ros__parameters:
+    joints:
+      - right_arm_joint1
+      - right_arm_joint2
+      - right_arm_joint3
+      - right_arm_joint4
+      - right_arm_joint5
+      - right_arm_joint6
+      - right_arm_joint7
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_partial_joints_goal: true
+    constraints:
+      stopped_velocity_tolerance: 0.05
+      goal_time: 1.0
+
+# Gripper position: 0.0 = open, 1.703 = closed (radians on <side>_gripper_joint).
+left_gripper_controller:
+  ros__parameters:
+    joint: left_gripper_joint
+    goal_tolerance: 0.02
+    allow_stalling: true
+    stall_timeout: 0.5
+    stall_velocity_threshold: 0.005
+
+right_gripper_controller:
+  ros__parameters:
+    joint: right_gripper_joint
+    goal_tolerance: 0.02
+    allow_stalling: true
+    stall_timeout: 0.5
+    stall_velocity_threshold: 0.005

@@ -1,0 +1,30 @@
+# Velocity / acceleration limits for MoveIt's time parameterisation. Position and
+# velocity limits are the URDF's; accelerations are not published by Galbot and are
+# set conservatively (arms 1.0, leg 0.5 rad/s^2, like the Moz1 config).
+default_velocity_scaling_factor: 0.1
+default_acceleration_scaling_factor: 0.1
+
+joint_limits:
+  leg_joint1: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 0.5}
+  leg_joint2: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 0.5}
+  leg_joint3: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 0.5}
+  leg_joint4: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 0.5}
+  leg_joint5: {has_velocity_limits: true, max_velocity: 1.0, has_acceleration_limits: true, max_acceleration: 0.5}
+  head_joint1: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  head_joint2: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  left_arm_joint1: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  left_arm_joint2: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  left_arm_joint3: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  left_arm_joint4: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  left_arm_joint5: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  left_arm_joint6: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  left_arm_joint7: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  left_gripper_joint: {has_velocity_limits: true, max_velocity: 0.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  right_arm_joint1: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  right_arm_joint2: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  right_arm_joint3: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  right_arm_joint4: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  right_arm_joint5: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  right_arm_joint6: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  right_arm_joint7: {has_velocity_limits: true, max_velocity: 1.5, has_acceleration_limits: true, max_acceleration: 1.0}
+  right_gripper_joint: {has_velocity_limits: true, max_velocity: 0.5, has_acceleration_limits: true, max_acceleration: 1.0}

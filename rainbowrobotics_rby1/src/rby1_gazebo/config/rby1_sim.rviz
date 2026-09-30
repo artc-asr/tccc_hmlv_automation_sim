@@ -1,0 +1,103 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Reference Frame: odom
+      Plane Cell Count: 20
+      Cell Size: 0.5
+      Color: 160; 160; 164
+      Value: true
+
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Durability Policy: Transient Local
+      Visual Enabled: true
+      Collision Enabled: false
+      Value: true
+
+    # Table / cube / cylinder from the Gazebo world (world_markers.py).
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Gazebo World
+      Enabled: true
+      Topic:
+        Value: /world_markers
+        Depth: 1
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+      Value: true
+
+    # Wheel odometry: a trail of arrows showing where the base has driven.
+    - Class: rviz_default_plugins/Odometry
+      Name: Odometry
+      Enabled: true
+      Topic:
+        Value: /odom
+      Keep: 200
+      Position Tolerance: 0.05
+      Angle Tolerance: 0.2
+      Shape:
+        Value: Arrow
+        Color: 255; 25; 0
+        Alpha: 1
+        Shaft Length: 0.3
+        Shaft Radius: 0.02
+        Head Length: 0.08
+        Head Radius: 0.05
+      Covariance:
+        Value: false
+      Value: true
+
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: false
+      Show Names: true
+      Marker Scale: 0.3
+      Value: false
+
+    - Class: rviz_default_plugins/Image
+      Name: Head Camera
+      Enabled: true
+      Topic:
+        Value: /head_camera/image
+      Value: true
+
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: odom
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Target Frame: base_footprint
+      Distance: 4.0
+      Focal Point:
+        X: 0.3
+        Y: 0.0
+        Z: 0.8
+      Pitch: 0.4
+      Yaw: 3.9
+      Near Clip Distance: 0.01
+    Saved: ~
+
+Window Geometry:
+  Width: 1500
+  Height: 950

@@ -1,0 +1,75 @@
+# Spirit AI Moz1 in the transfer cell: what transfer_demo.py and transfer_scene.py
+# need to know about the robot. The values are the ones the demo was tuned with
+# (verified runs 2026-09-29/30); see moz1_sim_gazebo for the robot's Gazebo model.
+name: moz1
+label: Spirit AI Moz1
+moveit_config: {robot: moz1, package: moz1_moveit_config}
+
+scene:
+  base_front: 0.321        # chassis front face, x in base_link (base_link.STL bounds)
+  base_z: 0.105            # free base: base_link height on its wheels
+
+tcp_link: "{side}_gripper_tcp_link"
+# links the held can may touch (MoveIt touch_links), each prefixed "<side>_"
+touch_links: [gripper_base_link, gripper_actuator_link, gripper_tcp_link,
+              gripper_narrow1_link, gripper_narrow2_link, gripper_narrow3_link,
+              gripper_narrow4_link, gripper_narrow_loop_link, gripper_wide1_link,
+              gripper_wide2_link, gripper_wide3_link, gripper_wide4_link,
+              gripper_wide_loop_link]
+
+arm_joints:
+  left: [LeftArm-0, LeftArm-1, LeftArm-2, LeftArm-3, LeftArm-4, LeftArm-5, LeftArm-6]
+  right: [RightArm-0, RightArm-1, RightArm-2, RightArm-3, RightArm-4, RightArm-5, RightArm-6]
+# joint ranges the corridor IK samples seeds from
+arm_limits:
+  left: [[-3.14, 2.09], [-2.96, 0.15], [-3.05, 3.05], [-2.25, 0.17], [-3.05, 3.05], [-1.65, 1.65], [-1.57, 1.57]]
+  right: [[-2.09, 3.14], [-2.96, 0.15], [-3.05, 3.05], [-0.17, 2.25], [-3.05, 3.05], [-1.65, 1.65], [-1.57, 1.57]]
+home_arms:
+  left: [-0.1570796327, -0.872664626, -0.3490658504, -1.5707963268, -0.6108652381, 0.1396263402, -0.1221730476]
+  right: [0.1570796327, -0.872664626, 0.3490658504, 1.5707963268, 0.6108652381, 0.1396263402, 0.1221730476]
+
+torso_joints: [LegWaist-0, LegWaist-1, LegWaist-2, LegWaist-3, LegWaist-4, LegWaist-5]
+torso_controller: torso_controller
+# Torso poses (degrees; home = the robot's standing pose), chosen per task by
+# collision-aware IK. From an offline sweep: pallet A's third top-layer row needs
+# lean45+, the conveyor works upright, the pallet-B deck needs deep, low_lean or
+# lean75. The torso joints are limited to 100 N·m (URDF); with the model's masses
+# a static sum over the links says, for the filled pair (2 × 4.2 kg):
+#   home + hands 0.53 m out  hip 81 N·m    → it folded while driving
+#   carry                    hip 48, knee 7, waist 52 N·m (hips back, chest upright)
+#   placing on the deck: low_lean 79, lean75 93 N·m at the hip (deep 77, but see
+#   deck_torsos)
+torso_presets:
+  home: [0, 60, -90, 30, 0, 0]
+  lean45: [0, 60, -90, 45, 0, 0]
+  lean60: [0, 60, -90, 60, 0, 0]
+  lean75: [0, 60, -90, 75, 0, 0]
+  deep: [0, 85, -145, 75, 0, 0]
+  low_lean: [0, 90, -150, 80, 0, 0]
+  carry: [0, 50, -100, 40, 0, 0]
+  # far reach: hips forward as well as the waist. Pallet A's 5th row on the
+  # lower level (handles 0.93 m out, 0.51 m up in base_link) is out of reach
+  # for every pose above; an IK sweep (hip 60-90, knee -60..-145, waist 70/80)
+  # reaches it with these two and their neighbours.
+  reach70: [0, 70, -90, 70, 0, 0]
+  reach80: [0, 80, -90, 80, 0, 0]
+# least lean first; the crouches last, for a low stack (layers:=2: handles at 0.62 m)
+pick_torsos: [home, lean45, lean60, lean75, reach70, reach80, deep, low_lean]
+# Placing on the deck, loaded. Not "deep": with 8.4 kg in hand the arms can't hold
+# the planned path in that crouch (they sag, the controller aborts) and the held
+# cans are driven down through the pallet deck before it gives up; low_lean has
+# placed cleanly every run.
+deck_torsos: [low_lean, lean75]
+
+# SDK stroke units (gripper macro + gripper_cmd_to_gap.csv; 0.10 ≈ 77 mm jaw gap,
+# 0.08 ≈ 63 mm, 0.026 ≈ 26 mm). Release at 0.10, not the 0.12 end stop (the finger
+# mimics would pass their limits). Approach half-open: wide sweeps the jaw into the
+# next row's handles. Close only to the 24 mm bar.
+gripper: {open: 0.10, approach: 0.08, closed: 0.026,
+          closed_threshold: 0.04, open_threshold: 0.06}   # grasp_helper's weld edges
+# Top-down grasp, jaw closing along base x (across the handle bar, which runs along
+# y). TCP +Z is the approach axis and the fingers close along TCP ±Y, so the TCP
+# frame is x_tcp = +y, y_tcp = +x, z_tcp = -z: a half turn about (1, 1, 0)/√2.
+# The second entry is the same grasp yawed 180°. [x, y, z, w]
+grasp_quats: [[0.7071067812, 0.7071067812, 0.0, 0.0], [0.7071067812, -0.7071067812, 0.0, 0.0]]
+grasp_z_offset: 0.0        # tcp above the handle bar's centre

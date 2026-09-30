@@ -1,0 +1,58 @@
+# Galbot G1 (One Golf) in the transfer cell: what transfer_demo.py and
+# transfer_scene.py need to know about the robot. Model: robots/g1/ (Fortress).
+name: g1
+label: Galbot G1
+moveit_config: {robot: galbot_g1, package: galbot_g1_moveit_config}
+
+scene:
+  base_front: 0.307        # chassis front face, x in base_link (collision bounds, ±0.307 m square)
+  base_z: 0.032            # base_link height resting on the ground (measured, Fortress)
+
+tcp_link: "{side}_gripper_tcp_link"
+touch_links: [gripper_flange_link, gripper_base_link, gripper_tcp_link,
+              gripper_l_knuckle_link, gripper_l_inner_knuckle_link, gripper_l_finger_link,
+              gripper_r_knuckle_link, gripper_r_inner_knuckle_link, gripper_r_finger_link]
+
+arm_joints:
+  left: [left_arm_joint1, left_arm_joint2, left_arm_joint3, left_arm_joint4, left_arm_joint5, left_arm_joint6, left_arm_joint7]
+  right: [right_arm_joint1, right_arm_joint2, right_arm_joint3, right_arm_joint4, right_arm_joint5, right_arm_joint6, right_arm_joint7]
+arm_limits:                # URDF ranges
+  left: [[-3.004, 3.004], [-1.608, 1.608], [-2.917, 2.917], [-2.568, 1.870], [-2.917, 2.917], [-0.823, 0.735], [-1.538, 1.538]]
+  right: [[-3.004, 3.004], [-1.608, 1.608], [-2.917, 2.917], [-1.870, 2.568], [-2.917, 2.917], [-0.735, 0.823], [-1.538, 1.538]]
+home_arms:                 # the SRDF "home": hands in front of the chest
+  left: [1.45, -0.85, 0.0, -2.07, -1.58, -0.72, 0.0]
+  right: [-1.45, 0.85, 0.0, 2.07, 1.58, 0.72, 0.0]
+
+torso_joints: [leg_joint1, leg_joint2, leg_joint3, leg_joint4, leg_joint5]
+torso_controller: leg_controller
+# Leg poses (degrees). home = the standing stance (0.6, 1.8, 1.2, 0, 0) rad. The torso
+# stays upright while leg_joint3 = leg_joint2 - leg_joint1; more leg_joint3 than that
+# leans it forward (~0.1 m of shoulder per 0.3 rad), more leg_joint1 moves the whole
+# upper body forward, less leg_joint2 lowers it. From an offline IK sweep over the leg
+# (collision-aware, both arms, pre-grasp and grasp; scene with cleared_rows 4, 3 layers):
+#   pallet A row 5 (handles 0.92 m out): not from home; reach, lean, reach_lean, …
+#   conveyor: home and most poses;  pallet-B box: crouch, reach and many low poses.
+# The leg actuators are rated 280-420 N·m (Galbot's MuJoCo model), so unlike the
+# Moz1's torso the loaded pair needs no special carry posture.
+torso_presets:
+  home: [34.4, 103.1, 68.8, 0, 0]
+  carry: [34.4, 103.1, 68.8, 0, 0]
+  reach: [51.6, 103.1, 51.6, 0, 0]        # (0.9, 1.8, 0.9): upright, 0.22 m forward
+  lean: [34.4, 103.1, 103.1, 0, 0]        # (0.6, 1.8, 1.8): leaning forward
+  reach_lean: [51.6, 103.1, 85.9, 0, 0]   # (0.9, 1.8, 1.5)
+  crouch: [34.4, 68.8, 34.4, 0, 0]        # (0.6, 1.2, 0.6): upright, shoulders ~0.25 m lower
+pick_torsos: [home, reach, lean, reach_lean, crouch]
+deck_torsos: [crouch, reach]
+
+# <side>_gripper_joint: 0 open (124 mm between the finger pads) .. 1.703 closed.
+# From the URDF: 0.6 ≈ 94 mm, 0.9 ≈ 70 mm, 1.2 ≈ 44 mm, 1.42 ≈ 25 mm. Close to
+# the 24 mm bar; grasp_helper welds past 1.1 (≈ 52 mm, before the pads touch).
+gripper: {open: 0.6, approach: 0.9, closed: 1.42,
+          closed_threshold: 1.1, open_threshold: 0.9}
+# Top-down grasp, jaw closing along base x across the handle bar. The G1's tcp
+# approaches along its +X and the fingers close along ±Y, so x_tcp = -z,
+# y_tcp = +x, z_tcp = -y; the second entry is the same grasp yawed 180°. [x, y, z, w]
+grasp_quats: [[0.5, 0.5, -0.5, 0.5], [-0.5, 0.5, 0.5, 0.5]]
+# The finger pads reach 48 mm below the tcp and the bar's centre is 34 mm above
+# the can body: grasp 2 cm higher so the fingertips stay clear of the body.
+grasp_z_offset: 0.02

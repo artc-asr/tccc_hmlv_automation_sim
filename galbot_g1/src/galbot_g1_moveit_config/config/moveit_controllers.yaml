@@ -1,0 +1,42 @@
+# move_group -> the sim's FollowJointTrajectory controllers.
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
+
+moveit_simple_controller_manager:
+  controller_names:
+    - left_arm_controller
+    - right_arm_controller
+    - leg_controller
+    - left_gripper_controller
+    - right_gripper_controller
+
+  left_arm_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints: [left_arm_joint1, left_arm_joint2, left_arm_joint3, left_arm_joint4,
+             left_arm_joint5, left_arm_joint6, left_arm_joint7]
+
+  right_arm_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints: [right_arm_joint1, right_arm_joint2, right_arm_joint3, right_arm_joint4,
+             right_arm_joint5, right_arm_joint6, right_arm_joint7]
+
+  leg_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints: [leg_joint1, leg_joint2, leg_joint3, leg_joint4, leg_joint5]
+
+  left_gripper_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints: [left_gripper_joint]
+
+  right_gripper_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints: [right_gripper_joint]

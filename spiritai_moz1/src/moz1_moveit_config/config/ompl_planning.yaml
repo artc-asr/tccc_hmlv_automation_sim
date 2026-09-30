@@ -1,0 +1,57 @@
+# OMPL planner configuration (PRD §9.2 "Use OMPL initially").
+# NOTE: schema is for MoveIt2 Humble (2.5.x): planning_plugin is a STRING and
+# request_adapters is a SPACE-SEPARATED STRING (not lists - lists are Iron+).
+planning_plugin: ompl_interface/OMPLPlanner
+start_state_max_bounds_error: 0.1
+jiggle_fraction: 0.05
+request_adapters: >-
+    default_planner_request_adapters/AddTimeOptimalParameterization
+    default_planner_request_adapters/ResolveConstraintFrames
+    default_planner_request_adapters/FixWorkspaceBounds
+    default_planner_request_adapters/FixStartStateBounds
+    default_planner_request_adapters/FixStartStateCollision
+    default_planner_request_adapters/FixStartStatePathConstraints
+
+planner_configs:
+  RRTConnectkConfigDefault:
+    type: geometric::RRTConnect
+    range: 0.0
+  RRTstarkConfigDefault:
+    type: geometric::RRTstar
+    range: 0.0
+    goal_bias: 0.05
+  PRMkConfigDefault:
+    type: geometric::PRM
+
+left_arm:
+  planner_configs:
+    - RRTConnectkConfigDefault
+    - RRTstarkConfigDefault
+    - PRMkConfigDefault
+  projection_evaluator: joints(LeftArm-0,LeftArm-1)
+  longest_valid_segment_fraction: 0.005
+
+right_arm:
+  planner_configs:
+    - RRTConnectkConfigDefault
+    - RRTstarkConfigDefault
+    - PRMkConfigDefault
+  projection_evaluator: joints(RightArm-0,RightArm-1)
+  longest_valid_segment_fraction: 0.005
+
+dual_arm:
+  planner_configs:
+    - RRTConnectkConfigDefault
+    - RRTstarkConfigDefault
+
+left_gripper:
+  planner_configs:
+    - RRTConnectkConfigDefault
+
+right_gripper:
+  planner_configs:
+    - RRTConnectkConfigDefault
+
+torso:
+  planner_configs:
+    - RRTConnectkConfigDefault

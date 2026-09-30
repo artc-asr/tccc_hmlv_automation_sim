@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>hmlv_cell_gazebo</name>
+  <version>0.1.0</version>
+  <description>
+    TCCC HMLV jerry-can cell in Gazebo Fortress for any of the dual-arm robots:
+    the transfer scene (pallet A, conveyor + filling station, pallet B), its demo,
+    and per-robot profiles (Spirit AI Moz1, Galbot G1). Reuses moz1_sim_gazebo's
+    grasp, conveyor and pose-TF plugins.
+  </description>
+  <maintainer email="khokcb@a-star.edu.sg">ARTC</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>moz1_sim_gazebo</exec_depend>
+  <exec_depend>moz1_moveit_config</exec_depend>
+  <exec_depend>galbot_one_golf_description</exec_depend>
+  <exec_depend>galbot_g1_moveit_config</exec_depend>
+  <exec_depend>gz_ros2_control</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
+  <exec_depend>moveit_ros_move_group</exec_depend>
+  <exec_depend>moveit_configs_utils</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""Convert a Rainbow Robotics rby1-sdk URDF into a ROS 2 / Gazebo friendly URDF.
+
+The rby1-sdk URDF (rby1-sdk/models/rby1a/urdf/model_v1.2.urdf) is written for the
+SDK's own dynamics library and is not directly loadable by ROS / Gazebo:
+
+  * collisions use a non-standard <capsule> geometry (urdfdom rejects it)
+  * base, wheels and gripper fingers have no collision geometry at all
+  * mesh paths are relative ("./meshes/X.dae")
+  * wheels (continuous joints) have no effort limit
+  * a non-standard <mobile> element and extra attributes are present
+
+This script fixes all of the above and writes a plain URDF body that is
+xacro:include'd by urdf/rby1.urdf.xacro.
+
+Usage:
+  sdk_urdf_to_ros.py <sdk_urdf> <out_urdf_xacro> [--mesh-prefix package://rby1_description/meshes/rby1a]
+"""
+import argparse
+import math
+import xml.etree.ElementTree as ET
+
+# Extra collision geometry that the SDK URDF lacks. Values derived from the
+# MuJoCo collision meshes shipped with rby1-sdk (models/rby1a/mujoco/assets).
+# (link) -> list of (xyz, rpy, geometry_tag, geometry_attrs)
+EXTRA_COLLISIONS = {
+    # Chassis body, kept clear of the ground so only wheels + casters touch it.
+    "base": [
+        ((-0.015, 0.0, 0.21), (0, 0, 0), "box", {"size": "0.64 0.46 0.30"}),
+        # Rear passive casters (bottom of MuJoCo base collision at x~-0.28, y~+-0.085).
+        ((-0.2755, 0.085, 0.04), (0, 0, 0), "sphere", {"radius": "0.04"}),
+        ((-0.2755, -0.085, 0.04), (0, 0, 0), "sphere", {"radius": "0.04"}),
+    ],
+    "wheel_r": [((0, 0, 0), (math.pi / 2, 0, 0), "cylinder", {"radius": "0.1", "length": "0.05"})],
+    "wheel_l": [((0, 0, 0), (math.pi / 2, 0, 0), "cylinder", {"radius": "0.1", "length": "0.05"})],
+    "ee_right": [((0, 0, -0.0365), (0, 0, 0), "box", {"size": "0.127 0.066 0.074"})],
+    "ee_left": [((0, 0, -0.0365), (0, 0, 0), "box", {"size": "0.127 0.066 0.074"})],
+}
+for _f in ("ee_finger_r1", "ee_finger_r2", "ee_finger_l1", "ee_finger_l2"):
+    EXTRA_COLLISIONS[_f] = [((0.005, 0, -0.0295), (0, 0, 0), "box", {"size": "0.0166 0.0326 0.0626"})]
+
+WHEEL_EFFORT = "60.0"  # N*m, generous: ~130 kg robot on 0.1 m radius wheels
+STRIP_ATTRS = {"acceleration", "in_model_type", "coltype"}
+
+
+def rpy_to_matrix(r, p, y):
+    cr, sr, cp, sp, cy, sy = math.cos(r), math.sin(r), math.cos(p), math.sin(p), math.cos(y), math.sin(y)
+    return [
+        [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+        [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+        [-sp, cp * sr, cp * cr],
+    ]
+
+
+def fmt(v):
+    return " ".join(f"{x:.6g}" for x in v)
+
+
+def make_collision(xyz, rpy, tag, attrs):
+    col = ET.Element("collision")
+    ET.SubElement(col, "origin", {"xyz": fmt(xyz), "rpy": fmt(rpy)})
+    geom = ET.SubElement(col, "geometry")
+    ET.SubElement(geom, tag, attrs)
+    return col
+
+
+def capsule_to_primitives(col):
+    """A capsule along its local z axis -> one cylinder + two end spheres."""
+    origin = col.find("origin")
+    xyz = [float(v) for v in origin.get("xyz", "0 0 0").split()] if origin is not None else [0, 0, 0]
+    rpy = [float(v) for v in origin.get("rpy", "0 0 0").split()] if origin is not None else [0, 0, 0]
+    cap = col.find("geometry/capsule")
+    radius, length = float(cap.get("radius")), float(cap.get("length"))
+    rot = rpy_to_matrix(*rpy)
+    axis = [rot[i][2] for i in range(3)]
+    out = [make_collision(xyz, rpy, "cylinder", {"radius": f"{radius:.6g}", "length": f"{length:.6g}"})]
+    for s in (1, -1):
+        c = [xyz[i] + s * axis[i] * length / 2 for i in range(3)]
+        out.append(make_collision(c, (0, 0, 0), "sphere", {"radius": f"{radius:.6g}"}))
+    return out
+
+
+def convert(src, dst, mesh_prefix):
+    tree = ET.parse(src)
+    robot = tree.getroot()
+
+    for mobile in robot.findall("mobile"):
+        robot.remove(mobile)
+
+    for el in robot.iter():
+        for a in STRIP_ATTRS & set(el.attrib):
+            del el.attrib[a]
+
+    for mesh in robot.iter("mesh"):
+        fn = mesh.get("filename")
+        mesh.set("filename", f"{mesh_prefix}/{fn.split('/')[-1]}")
+
+    for link in robot.findall("link"):
+        for col in link.findall("collision"):
+            if col.find("geometry/capsule") is not None:
+                idx = list(link).index(col)
+                link.remove(col)
+                for i, new in enumerate(capsule_to_primitives(col)):
+                    link.insert(idx + i, new)
+        for xyz, rpy, tag, attrs in EXTRA_COLLISIONS.get(link.get("name"), []):
+            link.append(make_collision(xyz, rpy, tag, attrs))
+
+    for joint in robot.findall("joint"):
+        if joint.get("type") == "continuous":
+            joint.find("limit").set("effort", WHEEL_EFFORT)
+
+    ET.indent(tree, space="  ")
+    body = ET.tostring(robot, encoding="unicode")
+    body = body.replace("<robot ", '<robot xmlns:xacro="http://www.ros.org/wiki/xacro" ', 1)
+    with open(dst, "w") as f:
+        f.write('<?xml version="1.0"?>\n')
+        f.write(f"<!-- AUTO-GENERATED by sdk_urdf_to_ros.py from {src.split('/')[-1]}. Do not edit by hand. -->\n")
+        f.write(body + "\n")
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("src")
+    ap.add_argument("dst")
+    ap.add_argument("--mesh-prefix", default="package://rby1_description/meshes/rby1a")
+    a = ap.parse_args()
+    convert(a.src, a.dst, a.mesh_prefix)

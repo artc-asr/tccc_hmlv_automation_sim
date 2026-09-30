@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!--
+  Holonomic base. Simulating the omni-wheel rollers with contact physics is slow and
+  unreliable, so the chassis is driven kinematically from a body-frame twist
+  (vx, vy, wz), which is how the real omni base behaves from the user's point of view.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Frictionless chassis colliders, so ground contact does not drag against the twist. -->
+  <xacro:macro name="frictionless" params="link">
+    <gazebo reference="${link}">
+      <mu1>0.0</mu1>
+      <mu2>0.0</mu2>
+    </gazebo>
+  </xacro:macro>
+  <xacro:frictionless link="omni_chassis_base_link"/>
+  <xacro:frictionless link="wheel_1"/>
+  <xacro:frictionless link="wheel_2"/>
+  <xacro:frictionless link="wheel_3"/>
+  <xacro:frictionless link="wheel_4"/>
+
+  <gazebo>
+    <plugin filename="gz-sim-velocity-control-system" name="gz::sim::systems::VelocityControl">
+      <topic>/cmd_vel</topic>
+    </plugin>
+
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <odom_topic>/odom</odom_topic>
+      <tf_topic>/odom/tf</tf_topic>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <dimensions>3</dimensions>
+    </plugin>
+  </gazebo>
+
+</robot>

@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Position-controlled joint with position/velocity feedback. -->
+  <xacro:macro name="position_joint" params="name initial:=0.0">
+    <joint name="${name}">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">${initial}</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Gripper: one actuated joint, the rest of the linkage follows via mimic. -->
+  <xacro:macro name="gripper_joints" params="side">
+    <xacro:position_joint name="${side}_gripper_joint"/>
+    <xacro:mimic_joint name="${side}_gripper_r_inner_knuckle_joint" of="${side}_gripper_joint" k="-1"/>
+    <xacro:mimic_joint name="${side}_gripper_r_finger_joint" of="${side}_gripper_joint" k="1"/>
+    <xacro:mimic_joint name="${side}_gripper_l_knuckle_joint" of="${side}_gripper_joint" k="1"/>
+    <xacro:mimic_joint name="${side}_gripper_l_inner_knuckle_joint" of="${side}_gripper_joint" k="1"/>
+    <xacro:mimic_joint name="${side}_gripper_l_finger_joint" of="${side}_gripper_joint" k="-1"/>
+  </xacro:macro>
+
+  <xacro:macro name="mimic_joint" params="name of k">
+    <joint name="${name}">
+      <param name="mimic">${of}</param>
+      <param name="multiplier">${k}</param>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
+  <ros2_control name="GalbotG1GazeboSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+
+    <!-- Leg (torso lift). Torso stays upright while leg_joint3 = leg_joint2 - leg_joint1. -->
+    <xacro:position_joint name="leg_joint1" initial="0.6"/>
+    <xacro:position_joint name="leg_joint2" initial="1.8"/>
+    <xacro:position_joint name="leg_joint3" initial="1.2"/>
+    <xacro:position_joint name="leg_joint4"/>
+    <xacro:position_joint name="leg_joint5"/>
+
+    <xacro:position_joint name="head_joint1"/>
+    <xacro:position_joint name="head_joint2"/>
+
+    <!-- Arms start in a "ready" pose: grippers in front of the torso. -->
+    <xacro:position_joint name="left_arm_joint1" initial="1.45"/>
+    <xacro:position_joint name="left_arm_joint2" initial="-0.85"/>
+    <xacro:position_joint name="left_arm_joint3" initial="0"/>
+    <xacro:position_joint name="left_arm_joint4" initial="-2.07"/>
+    <xacro:position_joint name="left_arm_joint5" initial="-1.58"/>
+    <xacro:position_joint name="left_arm_joint6" initial="-0.72"/>
+    <xacro:position_joint name="left_arm_joint7" initial="0"/>
+
+    <xacro:position_joint name="right_arm_joint1" initial="-1.45"/>
+    <xacro:position_joint name="right_arm_joint2" initial="0.85"/>
+    <xacro:position_joint name="right_arm_joint3" initial="0"/>
+    <xacro:position_joint name="right_arm_joint4" initial="2.07"/>
+    <xacro:position_joint name="right_arm_joint5" initial="1.58"/>
+    <xacro:position_joint name="right_arm_joint6" initial="0.72"/>
+    <xacro:position_joint name="right_arm_joint7" initial="0"/>
+
+    <xacro:gripper_joints side="left"/>
+    <xacro:gripper_joints side="right"/>
+  </ros2_control>
+
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(arg controllers_file)</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>

@@ -1,0 +1,113 @@
+<?xml version="1.0"?>
+<!--
+  Simulated sensors. Every camera gets a body frame (x forward, z up) and a ROS optical
+  frame (z forward, x right, y down). Images and camera_info are stamped with the optical
+  frame; the point cloud is re-stamped with the body frame by pointcloud_frame_relay.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:property name="PI" value="3.141592653589793"/>
+
+  <!-- RGB-D sensor attached to body frame `link`; adds <camera>_optical_frame under it. -->
+  <xacro:macro name="rgbd_camera" params="camera link width height hfov near far rate">
+    <link name="${camera}_optical_frame"/>
+    <joint name="${camera}_optical_joint" type="fixed">
+      <origin xyz="0 0 0" rpy="${-PI/2} 0 ${-PI/2}"/>
+      <parent link="${link}"/>
+      <child link="${camera}_optical_frame"/>
+    </joint>
+    <gazebo reference="${link}">
+      <sensor name="${camera}" type="rgbd_camera">
+        <gz_frame_id>${camera}_optical_frame</gz_frame_id>
+        <topic>${camera}</topic>
+        <update_rate>${rate}</update_rate>
+        <always_on>true</always_on>
+        <visualize>false</visualize>
+        <camera>
+          <horizontal_fov>${hfov}</horizontal_fov>
+          <image>
+            <width>${width}</width>
+            <height>${height}</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>${near}</near>
+            <far>${far}</far>
+          </clip>
+          <depth_camera>
+            <clip>
+              <near>${near}</near>
+              <far>${far}</far>
+            </clip>
+          </depth_camera>
+        </camera>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- Head RGB-D camera, in the face of head_link2 (x forward when head joints are zero). -->
+  <link name="head_camera_link"/>
+  <joint name="head_camera_joint" type="fixed">
+    <origin xyz="0.102 -0.03 0" rpy="${PI/2} 0 0"/>
+    <parent link="head_link2"/>
+    <child link="head_camera_link"/>
+  </joint>
+  <xacro:rgbd_camera camera="head_camera" link="head_camera_link" width="640" height="480" hfov="1.2" near="0.1" far="10.0" rate="15"/>
+
+  <!-- RealSense D405 on each wrist; the lens looks along +z of <side>_wrist_camera_link. -->
+  <xacro:macro name="wrist_camera" params="side">
+    <link name="${side}_wrist_camera_sensor_link"/>
+    <joint name="${side}_wrist_camera_sensor_joint" type="fixed">
+      <origin xyz="0 0 0.001" rpy="0 ${-PI/2} 0"/>
+      <parent link="${side}_wrist_camera_link"/>
+      <child link="${side}_wrist_camera_sensor_link"/>
+    </joint>
+    <xacro:rgbd_camera camera="${side}_wrist_camera" link="${side}_wrist_camera_sensor_link"
+                       width="640" height="480" hfov="1.52" near="0.07" far="2.0" rate="15"/>
+  </xacro:macro>
+  <xacro:wrist_camera side="left"/>
+  <xacro:wrist_camera side="right"/>
+
+  <!-- Livox Mid-360 on the chassis: 360 deg horizontal, -7..52 deg vertical.
+       The scan origin sits at the top of the sensor housing, clear of its own mesh. -->
+  <link name="chassis_lidar_sensor"/>
+  <joint name="chassis_lidar_sensor_joint" type="fixed">
+    <origin xyz="0 0 0.03" rpy="0 0 0"/>
+    <parent link="chassis_lidar"/>
+    <child link="chassis_lidar_sensor"/>
+  </joint>
+  <gazebo reference="chassis_lidar_sensor">
+    <sensor name="chassis_lidar" type="gpu_lidar">
+      <gz_frame_id>chassis_lidar_sensor</gz_frame_id>
+      <topic>lidar</topic>
+      <update_rate>10</update_rate>
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>900</samples>
+            <min_angle>${-PI}</min_angle>
+            <max_angle>${PI}</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>32</samples>
+            <min_angle>-0.1222</min_angle>
+            <max_angle>0.9076</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>0.1</min>
+          <max>40.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </lidar>
+    </sensor>
+  </gazebo>
+
+</robot>

@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!--
+  Galbot G1 (One Golf) for Gazebo Harmonic.
+  Wraps the upstream description (galbot_one_golf_description) unchanged and adds
+  ros2_control, the holonomic base plugins and the sensors.
+-->
+<robot name="galbot_g1" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="controllers_file" default="$(find galbot_g1_gazebo)/config/controllers.yaml"/>
+  <xacro:arg name="enable_sensors" default="true"/>
+
+  <!-- Wheels are kept fixed: the base is driven kinematically (see galbot_g1.base.xacro). -->
+  <xacro:arg name="enable_wheel_joints" default="false"/>
+  <xacro:arg name="enable_passive_wheels" default="false"/>
+
+  <xacro:include filename="$(find galbot_one_golf_description)/xacro/robot.xacro"/>
+
+  <xacro:include filename="$(find galbot_g1_gazebo)/urdf/galbot_g1.ros2_control.xacro"/>
+  <xacro:include filename="$(find galbot_g1_gazebo)/urdf/galbot_g1.base.xacro"/>
+  <xacro:if value="$(arg enable_sensors)">
+    <xacro:include filename="$(find galbot_g1_gazebo)/urdf/galbot_g1.sensors.xacro"/>
+  </xacro:if>
+
+</robot>

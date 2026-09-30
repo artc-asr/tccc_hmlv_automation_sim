@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!-- RB-Y1 (Model A v1.2) description: SDK-derived body + sensor frames. -->
+<robot name="rby1" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- base_footprint: ground projection of the drive-wheel axle center, i.e. the
+       robot's rotation center. The SDK "base" origin sits 0.228 m behind it.
+       diff_drive_controller odometry must be expressed in this frame. -->
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base"/>
+    <origin xyz="-0.228 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:include filename="$(find rby1_description)/urdf/rby1a_body.urdf.xacro"/>
+
+  <!-- Head camera (matches the commented "head_mount" in the SDK URDF) -->
+  <link name="head_camera_link"/>
+  <joint name="head_camera_joint" type="fixed">
+    <parent link="link_head_2"/>
+    <child link="head_camera_link"/>
+    <origin xyz="0.022 0 0.04" rpy="0 0 0"/>
+  </joint>
+
+  <link name="head_camera_optical_frame"/>
+  <joint name="head_camera_optical_joint" type="fixed">
+    <parent link="head_camera_link"/>
+    <child link="head_camera_optical_frame"/>
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+  </joint>
+
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.2" rpy="0 0 0"/>
+  </joint>
+
+</robot>

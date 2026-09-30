@@ -1,0 +1,119 @@
+<?xml version="1.0"?>
+<!-- Galbot G1 (One Golf) for Gazebo FORTRESS, for the transfer cell.
+
+     galbot_g1/ simulates the G1 in Gazebo Harmonic; the cell's plugins (grasp,
+     conveyor, pose->TF, in moz1_sim_gazebo) are Fortress systems, so the cell runs
+     it in Fortress with the same upstream description. Differences from
+     galbot_g1_gazebo's model: Fortress plugin names (ignition-gazebo-*), the apt
+     gz_ros2_control, no sensors, grippers on FollowJointTrajectory controllers
+     (like the Moz1's), and the gripper base link kept as its own gz link for the
+     grasp plugin. The collision geometry is STL + spheres, which Fortress loads;
+     the .glb visuals only show in RViz (Gazebo runs headless). -->
+<robot name="galbot_g1" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="controllers_file" default="$(find hmlv_cell_gazebo)/robots/g1/controllers.yaml"/>
+
+  <!-- wheels stay fixed: the base is driven kinematically (VelocityControl) -->
+  <xacro:include filename="$(find galbot_one_golf_description)/xacro/robot.xacro"/>
+
+  <xacro:macro name="pos_joint" params="name init:=0.0">
+    <joint name="${name}">
+      <command_interface name="position"/>
+      <state_interface name="position"><param name="initial_value">${init}</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+  <!-- gz has no mimic constraint: gz_ros2_control drives each linkage joint to
+       multiplier * <side>_gripper_joint (multipliers = the URDF <mimic> tags) -->
+  <xacro:macro name="mimic_joint" params="name of k">
+    <joint name="${name}">
+      <param name="mimic">${of}</param>
+      <param name="multiplier">${k}</param>
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+  <!-- The grippers start at 0.6 (the demo's "open", 94 mm), not at the 0.0 end stop:
+       starting on the joint limit, a gripper can stay stuck there in DART (the right
+       one never moved in Fortress, and stalled at first in Harmonic). -->
+  <xacro:macro name="gripper_joints" params="side">
+    <xacro:pos_joint name="${side}_gripper_joint" init="0.6"/>
+    <xacro:mimic_joint name="${side}_gripper_r_inner_knuckle_joint" of="${side}_gripper_joint" k="-1"/>
+    <xacro:mimic_joint name="${side}_gripper_r_finger_joint" of="${side}_gripper_joint" k="1"/>
+    <xacro:mimic_joint name="${side}_gripper_l_knuckle_joint" of="${side}_gripper_joint" k="1"/>
+    <xacro:mimic_joint name="${side}_gripper_l_inner_knuckle_joint" of="${side}_gripper_joint" k="1"/>
+    <xacro:mimic_joint name="${side}_gripper_l_finger_joint" of="${side}_gripper_joint" k="-1"/>
+  </xacro:macro>
+
+  <ros2_control name="galbot_g1_gz_system" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+    <!-- standing: torso upright (leg_joint3 = leg_joint2 - leg_joint1) -->
+    <xacro:pos_joint name="leg_joint1" init="0.6"/>
+    <xacro:pos_joint name="leg_joint2" init="1.8"/>
+    <xacro:pos_joint name="leg_joint3" init="1.2"/>
+    <xacro:pos_joint name="leg_joint4"/>
+    <xacro:pos_joint name="leg_joint5"/>
+    <xacro:pos_joint name="head_joint1"/>
+    <xacro:pos_joint name="head_joint2"/>
+    <!-- arms: the SRDF "home" (hands in front of the chest) -->
+    <xacro:pos_joint name="left_arm_joint1" init="1.45"/>
+    <xacro:pos_joint name="left_arm_joint2" init="-0.85"/>
+    <xacro:pos_joint name="left_arm_joint3" init="0"/>
+    <xacro:pos_joint name="left_arm_joint4" init="-2.07"/>
+    <xacro:pos_joint name="left_arm_joint5" init="-1.58"/>
+    <xacro:pos_joint name="left_arm_joint6" init="-0.72"/>
+    <xacro:pos_joint name="left_arm_joint7" init="0"/>
+    <xacro:pos_joint name="right_arm_joint1" init="-1.45"/>
+    <xacro:pos_joint name="right_arm_joint2" init="0.85"/>
+    <xacro:pos_joint name="right_arm_joint3" init="0"/>
+    <xacro:pos_joint name="right_arm_joint4" init="2.07"/>
+    <xacro:pos_joint name="right_arm_joint5" init="1.58"/>
+    <xacro:pos_joint name="right_arm_joint6" init="0.72"/>
+    <xacro:pos_joint name="right_arm_joint7" init="0"/>
+    <xacro:gripper_joints side="left"/>
+    <xacro:gripper_joints side="right"/>
+  </ros2_control>
+
+  <gazebo>
+    <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(arg controllers_file)</parameters>
+    </plugin>
+  </gazebo>
+
+  <!-- Keep <side>_gripper_base_link as its own gz link (its joint is fixed, so
+       urdf2sdf would lump it into the wrist): the grasp plugin holds cans there. -->
+  <gazebo reference="left_gripper_base_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
+  <gazebo reference="right_gripper_base_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
+
+  <!-- Holonomic base, driven kinematically from /cmd_vel (vx, vy, wz) on
+       frictionless chassis colliders, as galbot_g1_gazebo does. -->
+  <xacro:macro name="frictionless" params="link">
+    <gazebo reference="${link}"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
+  </xacro:macro>
+  <xacro:frictionless link="omni_chassis_base_link"/>
+  <xacro:frictionless link="wheel_1"/>
+  <xacro:frictionless link="wheel_2"/>
+  <xacro:frictionless link="wheel_3"/>
+  <xacro:frictionless link="wheel_4"/>
+  <gazebo>
+    <plugin filename="ignition-gazebo-velocity-control-system"
+            name="ignition::gazebo::systems::VelocityControl">
+      <topic>cmd_vel</topic>
+    </plugin>
+    <plugin filename="ignition-gazebo-odometry-publisher-system"
+            name="ignition::gazebo::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <odom_topic>odom</odom_topic>
+      <tf_topic>tf</tf_topic>
+      <dimensions>3</dimensions>
+    </plugin>
+  </gazebo>
+</robot>

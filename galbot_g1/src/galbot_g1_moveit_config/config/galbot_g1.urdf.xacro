@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!-- The robot MoveIt plans for: Galbot's upstream description, unchanged. The sims
+     spawn their own wrapper of the same xacro (plus ros2_control / gz plugins). -->
+<robot name="galbot_g1" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find galbot_one_golf_description)/xacro/robot.xacro"/>
+</robot>
