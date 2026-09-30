@@ -26,6 +26,9 @@ MoveIt scene is re-expressed in base_link after every drive (MoveIt's `world` is
 the base — the SRDF virtual joint is fixed).
 
 Parameters: scene_file, robot_file (the profile), speed.
+
+The current step is published (latched) on /transfer_demo/phase as one of PHASES
+(then "failed" if it stops): record_run.py records it for the web replay.
 """
 import math
 import os
@@ -46,6 +49,7 @@ from moveit_msgs.srv import GetCartesianPath, GetPositionIK, GetStateValidity
 from nav_msgs.msg import Odometry
 from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from std_msgs.msg import Empty, String
@@ -59,6 +63,9 @@ from geometry_msgs.msg import Quaternion  # noqa: E402
 from moveit_msgs.msg import AttachedCollisionObject  # noqa: E402
 
 SIDES = ("left", "right")
+# the steps of run(), in order, as published on /transfer_demo/phase
+PHASES = ("drive_a", "pick_a", "drive_load", "place_conveyor", "conveyor", "drive_unload",
+          "pick_filled", "drive_b", "place_box", "home", "done")
 # Robot specifics — joint names, torso poses (degrees; "home" and "carry" are
 # required), the pick / deck torso candidates, gripper positions and grasp
 # orientation — come from the robot profile (robots/<robot>.yaml).
@@ -103,6 +110,9 @@ class TransferDemo(JerrycanDemo):
         self.fjt = dict(self.arm_fjt, torso=ActionClient(
             self, FollowJointTrajectory, f"/{r['torso_controller']}/follow_joint_trajectory"))
         self.recolor_pub = self.create_publisher(String, "/scene_markers/recolor", 10)
+        self.phase_pub = self.create_publisher(
+            String, "/transfer_demo/phase",
+            QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL))
         self.conveyor_done = threading.Event()
         self.create_subscription(Empty, "/conveyor/done",
                                  lambda _m: self.conveyor_done.set(), 10)
@@ -113,6 +123,10 @@ class TransferDemo(JerrycanDemo):
         # re-expressed in base_link whenever the base has moved:
         #   name -> ("box", center, size) | ("can", bottom, body_only)
         self.objects = {}
+
+    def phase(self, name):
+        """Publish the step run() is on (PHASES, or "failed")."""
+        self.phase_pub.publish(String(data=name))
 
     def wait_for_servers(self):
         """The arm / gripper controllers and move_group (JerrycanDemo), then the torso
@@ -819,7 +833,9 @@ class TransferDemo(JerrycanDemo):
         self.get_logger().info(
             f"4 L jerry cans: {s['empty_mass']} kg empty, {s['filled_mass']} kg filled. "
             f"One pair: pallet A → conveyor → filling → box on pallet B")
+        self.phase("drive_a")
         self.drive_to(*st["A"], "pallet A")
+        self.phase("pick_a")
         self.setup_scene()
         self.dual_gripper(self.g_approach)
 
@@ -862,12 +878,15 @@ class TransferDemo(JerrycanDemo):
             self.torso_to("home")
 
         # --- conveyor, load station: both cans side by side on the belt
+        self.phase("drive_load")
         quats = self.dual_move_to({s_: (carry[s_][0], carry[s_][1], carry[s_][2] + PRE_GRASP)
                                    for s_ in SIDES}, quats, "to the carry pose")
         self.drive_to(*st["load"], "conveyor load")
+        self.phase("place_conveyor")
         self.place_pair(names, load, quats, "conveyor")
 
         # --- conveyor: carry to the filling station
+        self.phase("conveyor")
         self.get_logger().info("conveyor running → filling station ...")
         self.conveyor_done.clear()
         self.conveyor_start.publish(Empty())
@@ -882,7 +901,9 @@ class TransferDemo(JerrycanDemo):
         self.get_logger().info(f"delivered and filled: {s['filled_mass']} kg each (now red)")
 
         # --- unload station: pick the filled pair
+        self.phase("drive_unload")
         self.drive_to(*st["unload"], "conveyor unload")
+        self.phase("pick_filled")
         bottoms = {s_: self.locate(names[s_], unload[s_], tol=0.04) for s_ in SIDES}
         quats = self.pick_pair(names, bottoms, PRE_GRASP + 0.05, "filled")
         self.get_logger().info(f"picked both (filled, {s['filled_mass']} kg each)")
@@ -898,7 +919,9 @@ class TransferDemo(JerrycanDemo):
         # The torso goes down with the arms still curled, and only then do the arms
         # reach out over the box: the load is extended only once its centre of
         # gravity is low.
+        self.phase("drive_b")
         self.drive_to(*st["B"], "pallet B", vmax=0.12, accel=0.15)
+        self.phase("place_box")
         slots = s["b_slots"]
         deck = {s_: (slots[s_][0], slots[s_][1], slots[s_][2] + 0.003) for s_ in SIDES}
         quats = None
@@ -938,7 +961,9 @@ class TransferDemo(JerrycanDemo):
         if quats is None:
             raise StepFailed("the box on pallet B is out of reach for every torso pose")
         self.place_pair(names, slots, quats, "pallet-B box")
+        self.phase("home")
         self.go_home()
+        self.phase("done")
         self.get_logger().info("done: both filled jerry cans verified in the box on pallet B")
 
 
@@ -953,6 +978,7 @@ def main():
         node.run()
     except StepFailed as exc:
         node.get_logger().error(f"stopped: {exc}")
+        node.phase("failed")
     except KeyboardInterrupt:
         pass
     finally:

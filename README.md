@@ -25,6 +25,16 @@ reuses Moz1's grasp and conveyor plugins), and it runs the G1 in Fortress too:
 ./sim.sh cell robot:=g1       # the same demo with the Galbot G1
 ```
 
+**Web replay** ([`docs/`](docs/), served by GitHub Pages): a recorded run of the transfer
+demo in the browser — Start, the demo's steps lighting up as it goes, and a 3D view you
+can orbit and zoom. It is a replay (Pages can't run ROS); to record a new one:
+
+```bash
+./sim.sh cell rviz:=false record:=/tmp/run_moz1   # stop it (./sim.sh stop) once recording.json is written
+tools/web_replay/build.py /tmp/run_moz1            # -> docs/data/ (pip install trimesh fast-simplification)
+python3 -m http.server -d docs 8000                # preview at http://localhost:8000
+```
+
 ## Quick start
 
 ```bash
@@ -92,5 +102,6 @@ spiritai_moz1/          Moz1 workspace: src/, source_sim.sh, docs/ISAAC.md
 galbot_g1/              Galbot G1 workspace: src/, source_sim.sh
 rainbowrobotics_rby1/   RB-Y1 workspace: src/, source_sim.sh
 hmlv_cell/              the jerry-can cell (Fortress, overlays spiritai_moz1/): transfer demo for any robot
+docs/                   the web replay (GitHub Pages); tools/web_replay/build.py fills docs/data/
 third_party/            gz_ros2_control (humble, built for Harmonic), symlinked into G1 + RB-Y1
 ```

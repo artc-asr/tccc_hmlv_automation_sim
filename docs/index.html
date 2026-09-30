@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HMLV Transfer Replay</title>
+  <meta name="description" content="Replay of the Moz1 jerry-can transfer demo recorded in Gazebo: pallet A → conveyor → filling → box on pallet B.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "urdf-loader": "https://cdn.jsdelivr.net/npm/urdf-loader@0.12.6/src/URDFLoader.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="bar">
+    <div class="controls">
+      <button id="start" class="start" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path id="start-icon" d="M8 5v14l11-7z"/></svg>
+        <span id="start-label">Loading…</span>
+      </button>
+      <div class="speed" role="group" aria-label="Playback speed">
+        <button data-speed="1">1×</button>
+        <button data-speed="2" class="on">2×</button>
+        <button data-speed="4">4×</button>
+        <button data-speed="8">8×</button>
+      </div>
+      <span id="clock" class="clock">0:00 / 0:00</span>
+    </div>
+    <div class="title">
+      <h1>HMLV jerry-can transfer</h1>
+      <span id="robot-name" class="chip">—</span>
+    </div>
+  </header>
+
+  <div class="timeline">
+    <div id="segments" class="segments"></div>
+    <input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="Timeline">
+  </div>
+
+  <main class="layout">
+    <aside class="side">
+      <h2>States</h2>
+      <ol id="phases" class="phases"></ol>
+      <h2>Demo log</h2>
+      <div id="log" class="log" aria-live="polite"></div>
+    </aside>
+
+    <section class="view">
+      <canvas id="canvas"></canvas>
+      <div class="view-tools">
+        <button id="follow" class="tool" aria-pressed="false">Follow robot</button>
+        <button id="reset" class="tool">Reset view</button>
+      </div>
+      <div class="hint">Drag to rotate · right-drag to pan · scroll to zoom</div>
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <div id="loading-text">Loading robot model…</div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

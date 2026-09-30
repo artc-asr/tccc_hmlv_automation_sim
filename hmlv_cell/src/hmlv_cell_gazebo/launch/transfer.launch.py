@@ -26,6 +26,8 @@ Args:
                 layer, the furthest row with nothing in front
   demo          run the sequence (default true)
   speed         free-space velocity scaling (default 0.4)
+  record        a directory: record the run there for the web replay
+                (scripts/record_run.py; tools/web_replay/build.py builds docs/ from it)
   gui, rviz, spawn_delay
 """
 import os
@@ -124,7 +126,14 @@ def launch_setup(context, *args, **kwargs):
                 condition=IfCondition(arg("demo")),
                 parameters=[{"use_sim_time": True, "scene_file": scene_file,
                              "robot_file": robot_file, "speed": float(arg("speed"))}])
-    return [sim, conveyor_bridge, *tfs, can_tf, markers, rviz, demo]
+    nodes = [sim, conveyor_bridge, *tfs, can_tf, markers, rviz, demo]
+    if arg("record"):
+        nodes.append(Node(
+            package="hmlv_cell_gazebo", executable="record_run.py", name="record_run",
+            output="screen",
+            parameters=[{"use_sim_time": True, "out_dir": arg("record"), "world_file": world,
+                         "robot": robot}]))
+    return nodes
 
 
 def generate_launch_description():
@@ -141,5 +150,7 @@ def generate_launch_description():
                               description="Gazebo's own window; RViz is the view."),
         DeclareLaunchArgument("rviz", default_value="true"),
         DeclareLaunchArgument("spawn_delay", default_value="8.0"),
+        DeclareLaunchArgument("record", default_value="",
+                              description="Directory to record the run into (web replay)."),
         OpaqueFunction(function=launch_setup),
     ])
