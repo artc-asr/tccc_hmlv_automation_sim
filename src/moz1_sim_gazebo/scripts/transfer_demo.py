@@ -134,11 +134,14 @@ class TransferDemo(JerrycanDemo):
 
     def drive_to(self, x, y, name, timeout=120.0, vmax=0.25, accel=0.3):
         """Holonomic drive on /odom to (x, y), heading +x. Two phases, repeated:
-        translate (with heading correction) to within 1 cm, then turn in place to
-        within 0.5° — the base yaws a little while it translates, and chasing both
-        at once rarely has them in tolerance at the same instant. Everything after
-        a drive is computed from the ACTUAL base pose (and the cans are located in
-        Gazebo before each pick), so up to 3 cm / 1.5° left over is accepted.
+        translate (with heading correction) to within 1.5 cm, then turn in place
+        to within 0.7° — the base yaws a little while it translates, and chasing
+        both at once rarely has them in tolerance at the same instant. Done at
+        2 cm / 1°. Everything after a drive is computed from the ACTUAL base pose
+        (and the cans are located in Gazebo before each pick), so up to
+        3 cm / 1.5° left over is accepted. (Tighter, 1 cm / 0.5°, the two phases
+        could bounce off each other for all six rounds at creep speed: a 1.3 m
+        drive once took 120 s.)
 
         Acceleration is limited (ACCEL): gz's base plugin applies the commanded
         velocity instantly, and those jerks spike the torso's joint torques when the
@@ -187,25 +190,26 @@ class TransferDemo(JerrycanDemo):
             self.cmd_vel.publish(t)
             time.sleep(0.05)
 
-        for _ in range(6):
+        rounds = 0
+        for rounds in range(1, 7):
             while True:                                   # translate
                 ex, ey, eyaw, yaw = errors()
                 d = math.hypot(ex, ey)
-                if d < 0.01 or time.monotonic() - t0 > timeout:
+                if d < 0.015 or time.monotonic() - t0 > timeout:
                     break
-                v = min(vmax, max(0.03, 1.2 * d))
+                v = min(vmax, max(0.05, 1.2 * d))
                 send(ex / d * v, ey / d * v, max(-0.3, min(0.3, 1.5 * eyaw)), yaw)
             while True:                                   # turn in place
                 ex, ey, eyaw, yaw = errors()
-                if abs(eyaw) < 0.009 or time.monotonic() - t0 > timeout:
+                if abs(eyaw) < 0.012 or time.monotonic() - t0 > timeout:
                     break
-                send(0.0, 0.0, math.copysign(max(0.02, min(0.3, 1.5 * abs(eyaw))), eyaw), yaw)
+                send(0.0, 0.0, math.copysign(max(0.04, min(0.3, 1.5 * abs(eyaw))), eyaw), yaw)
             for _ in range(20):                           # ramp down to rest
                 send(0.0, 0.0, 0.0, yaw)
                 if cur == [0.0, 0.0]:
                     break
             ex, ey, eyaw, _ = errors()
-            if math.hypot(ex, ey) < 0.01 and abs(eyaw) < 0.009:
+            if math.hypot(ex, ey) < 0.02 and abs(eyaw) < 0.017:
                 break
         for _ in range(10):
             self.cmd_vel.publish(Twist())
@@ -216,7 +220,8 @@ class TransferDemo(JerrycanDemo):
             raise StepFailed(f"could not reach the {name} station: at ({bx:+.3f}, {by:+.3f}), "
                              f"heading {math.degrees(yaw):+.1f}°")
         self.get_logger().info(f"  at ({bx:+.3f}, {by:+.3f}), heading {math.degrees(yaw):+.2f}° "
-                               f"({math.hypot(ex, ey) * 1000:.0f} mm off)")
+                               f"({math.hypot(ex, ey) * 1000:.0f} mm off; {rounds} round(s), "
+                               f"{time.monotonic() - t0:.1f} s)")
         self.refresh_scene()
 
     # ----------------------------------------------------------- planning scene
