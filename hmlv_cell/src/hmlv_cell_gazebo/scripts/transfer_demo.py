@@ -539,11 +539,41 @@ class TransferDemo(JerrycanDemo):
                 raise StepFailed(f"{k}: controller error {res.error_code}")
         return True
 
+    def _arms_touch(self):
+        """Is the current state in contact between the two arms (either side's
+        links)? Returns the contact pair or None."""
+        req = GetStateValidity.Request(group_name="dual_arm")
+        req.robot_state = RobotState(is_diff=True)
+        res = self._wait(self.validity.call_async(req), 10.0, "check_state_validity")
+        for c in res.contacts:
+            if {c.contact_body_1.split("_")[0], c.contact_body_2.split("_")[0]} == {"left", "right"}:
+                return c.contact_body_1, c.contact_body_2
+        return None
+
+    def _unstick_arms(self, dy=0.015):
+        """If the two arms touch where they stand (a valid but marginal goal plus a
+        few mm of tracking error: the G1's wrist cameras after the lean over pallet
+        A), every plan from here fails on the start state: move the hands `dy`
+        apart sideways first, straight, without collision checking."""
+        pair = self._arms_touch()
+        if pair is None:
+            return
+        self.get_logger().info(f"  arms touching ({pair[0]} / {pair[1]}): hands "
+                               f"{dy * 100:.1f} cm apart first")
+        q = {s: self.tf.lookup_transform(FRAME, self.tcp[s], rclpy.time.Time()).transform.rotation
+             for s in SIDES}
+        now = {s: self.tcp_now(s) for s in SIDES}
+        self.dual_straight({s: (p[0], p[1] + (dy if s == "left" else -dy), p[2])
+                            for s, p in now.items()},
+                           {s: Quaternion(x=q[s].x, y=q[s].y, z=q[s].z, w=q[s].w) for s in SIDES},
+                           0.05, check=False)
+
     def dual_joint_goal(self, sols, what):
         if self._direct_joint({sd: (self.arm_joints[sd], sols[sd]) for sd in SIDES}, self.speed):
             self.settle("dual")
             return
         self.get_logger().info(f"  planning {what} around the obstacle instead")
+        self._unstick_arms()
         c = Constraints()
         c.joint_constraints = [
             JointConstraint(joint_name=n, position=v, tolerance_above=0.005,
