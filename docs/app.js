@@ -25,7 +25,9 @@ const PHASES = [
   ["home", "Return home", "Torso and arms back to their home pose."],
   ["done", "Done", "Both filled cans verified in the box on pallet B."],
 ];
-const ROBOTS = { moz1: "Spirit AI Moz1", g1: "Galbot G1" };
+// ?robot=<id> picks the replay (data/<id>/); data/index.json lists them
+const params = new URLSearchParams(location.search);
+let DATA = "data/moz1/";
 const LEAD_IN = 1.5;          // s of the recording shown before the first step
 
 const $ = (id) => document.getElementById(id);
@@ -147,7 +149,7 @@ function loadRobot(onProgress) {
     manager.onProgress = (_url, done, total) => onProgress(done, total);
     manager.onLoad = () => (model ? resolve(model) : null);
     manager.onError = (url) => reject(new Error(`could not load ${url}`));
-    loader.load("data/robot/robot.urdf", (m) => {
+    loader.load(`${DATA}robot/robot.urdf`, (m) => {
       model = m;
       if (manager.itemsLoaded >= manager.itemsTotal) resolve(model);
     });
@@ -380,15 +382,45 @@ function frame() {
 resize();
 frame();
 
+// ------------------------------------------------------------------ robot switch
+function renderRobotSwitch(robots, current) {
+  const box = $("robots");
+  box.innerHTML = "";
+  for (const r of robots) {
+    const b = document.createElement("button");
+    b.textContent = r.label;
+    b.classList.toggle("on", r.id === current.id);
+    b.setAttribute("aria-pressed", String(r.id === current.id));
+    // a fresh page per robot: its own model, scene and run (keeps the speed)
+    b.addEventListener("click", () => {
+      if (r.id === current.id) return;
+      const q = new URLSearchParams({ robot: r.id });
+      if (speed !== 2) q.set("speed", speed);
+      location.search = q.toString();
+    });
+    box.appendChild(b);
+  }
+}
+const askedSpeed = Number(params.get("speed"));
+if ([1, 2, 4, 8].includes(askedSpeed)) {
+  speed = askedSpeed;
+  document.querySelectorAll(".speed button").forEach((x) =>
+    x.classList.toggle("on", Number(x.dataset.speed) === speed));
+}
+
 // ------------------------------------------------------------------ load
 (async () => {
   try {
+    const index = await fetch("data/index.json").then((r) => r.json());
+    const robots = index.robots;
+    const robot = robots.find((r) => r.id === params.get("robot")) ?? robots[0];
+    DATA = `data/${robot.id}/`;
+    renderRobotSwitch(robots, robot);
     const [runData, sceneData] = await Promise.all([
-      fetch("data/run.json").then((r) => r.json()),
-      fetch("data/scene.json").then((r) => r.json()),
+      fetch(`${DATA}run.json`).then((r) => r.json()),
+      fetch(`${DATA}scene.json`).then((r) => r.json()),
     ]);
     run = runData;
-    $("robot-name").textContent = ROBOTS[run.robot] ?? run.robot ?? "robot";
     buildScene(sceneData);
     buildSegments();
     renderPhaseList();
@@ -398,7 +430,7 @@ frame();
     prepareRobot(model);
     run.joint_names.forEach((n, c) => { if (model.joints[n]) jointIdx.push([model.joints[n], c]); });
     // ?t=<seconds> opens the replay at that moment
-    const at = Number(new URLSearchParams(location.search).get("t"));
+    const at = Number(params.get("t"));
     if (at > 0) { started = true; apply(t0 + at); } else apply(t0);
     $("loading").classList.add("gone");
     $("start").disabled = false;

@@ -2,15 +2,18 @@
 """build.py — turn a recorded transfer run into the web replay's data (docs/data/).
 
     ros2 launch hmlv_cell_gazebo transfer.launch.py rviz:=false record:=/tmp/run_moz1
-    tools/web_replay/build.py /tmp/run_moz1            # -> docs/data/
+    tools/web_replay/build.py /tmp/run_moz1            # -> docs/data/moz1/
 
 Reads what hmlv_cell_gazebo's record_run.py wrote (recording.json, robot.urdf,
-world.sdf) and writes, for docs/index.html:
+world.sdf) and writes, for docs/index.html, into docs/data/<robot>/ (the robot
+the run was recorded with; one replay per robot, the page switches between them):
 
-    data/run.json            samples (joints, base, moving cans) + phases, logs, recolours
-    data/scene.json          the world's boxes / cylinders / spheres (gz world frame)
-    data/robot/robot.urdf    visuals only, mesh paths made relative
-    data/robot/meshes/*.stl  the URDF's meshes, decimated to --face-budget faces in all
+    run.json                 samples (joints, base, moving cans) + phases, logs, recolours
+    scene.json               the world's boxes / cylinders / spheres (gz world frame)
+    robot/robot.urdf         visuals only, mesh paths made relative
+    robot/meshes/*.stl       the URDF's meshes, decimated to --face-budget faces in all
+
+and lists the robots that have a replay in docs/data/index.json.
 
 Meshes are found from package:// URIs in the workspaces of this repo (any
 directory with that package's package.xml), or absolute file:// paths.
@@ -30,6 +33,8 @@ import numpy as np
 import trimesh
 
 REPO = Path(__file__).resolve().parents[2]
+DATA = REPO / "docs" / "data"
+LABELS = {"moz1": "Spirit AI Moz1", "g1": "Galbot G1"}
 
 
 # ------------------------------------------------------------------ robot model
@@ -75,6 +80,12 @@ def build_robot(urdf_text, out, budget):
     for link in root.findall("link"):
         for el in link.findall("collision") + link.findall("inertial"):
             link.remove(el)
+    # urdf-loader reads these attributes without URDF's defaults (the G1 has <axis/>)
+    for el in root.iter("axis"):
+        el.set("xyz", el.get("xyz") or "1 0 0")
+    for el in root.iter("origin"):
+        for k in ("xyz", "rpy"):
+            el.set(k, el.get(k) or "0 0 0")
 
     meshes = {}                         # uri -> Mesh element(s)
     for m in root.iter("mesh"):
@@ -188,12 +199,13 @@ def build_run(rec, movable):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("run_dir", type=Path)
-    ap.add_argument("--out", type=Path, default=REPO / "docs" / "data")
+    ap.add_argument("--out", type=Path, help="default: docs/data/<robot>")
     ap.add_argument("--face-budget", type=int, default=120_000,
                     help="robot mesh faces in all (default 120k, ~6 MB of STL)")
     a = ap.parse_args()
 
     rec = json.loads((a.run_dir / "recording.json").read_text())
+    a.out = a.out or DATA / (rec.get("robot") or "robot")
     if a.out.exists():
         shutil.rmtree(a.out)
     (a.out / "robot").mkdir(parents=True)
@@ -205,6 +217,17 @@ def main():
     (a.out / "scene.json").write_text(json.dumps(scene, separators=(",", ":")))
     size = sum(f.stat().st_size for f in a.out.rglob("*") if f.is_file())
     print(f"wrote {a.out} ({size / 1e6:.1f} MB)")
+    write_index()
+
+
+def write_index():
+    """docs/data/index.json: the robots with a replay, Moz1 first."""
+    order = list(LABELS)
+    robots = sorted((d.name for d in DATA.iterdir() if (d / "run.json").is_file()),
+                    key=lambda r: (order.index(r) if r in order else len(order), r))
+    (DATA / "index.json").write_text(json.dumps(
+        {"robots": [{"id": r, "label": LABELS.get(r, r)} for r in robots]}, indent=1))
+    print(f"index: {', '.join(robots)}")
 
 
 if __name__ == "__main__":

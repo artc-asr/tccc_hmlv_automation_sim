@@ -1,0 +1,12 @@
+{
+ "robots": [
+  {
+   "id": "moz1",
+   "label": "Spirit AI Moz1"
+  },
+  {
+   "id": "g1",
+   "label": "Galbot G1"
+  }
+ ]
+}
