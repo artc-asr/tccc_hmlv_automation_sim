@@ -436,6 +436,17 @@ if ([1, 2, 4, 8].includes(askedSpeed)) {
     const robot = robots.find((r) => r.id === params.get("robot")) ?? robots[0];
     DATA = `data/${robot.id}/`;
     renderRobotSwitch(robots, robot);
+    // the robot models download alongside run.json, all of them at once (index.json
+    // lists their dirs; an older index without them: robot/, or after run.json)
+    const progress = {};
+    const models = {};
+    const loadModel = (dir) => (models[dir] ??= loadRobot(`${DATA}${dir}robot.urdf`, (done, total) => {
+      progress[dir] = [done, total];
+      const p = Object.values(progress);
+      $("loading-text").textContent = `Loading robot model${p.length > 1 ? "s" : ""}… ` +
+        `${p.reduce((s, x) => s + x[0], 0)}/${p.reduce((s, x) => s + x[1], 0)}`;
+    }));
+    (robot.models ?? ["robot/"]).forEach(loadModel);
     const [runData, sceneData] = await Promise.all([
       getJSON(`${DATA}run.json`),
       getJSON(`${DATA}scene.json`),
@@ -464,10 +475,9 @@ if ([1, 2, 4, 8].includes(askedSpeed)) {
     // one robot: data/<id>/robot/; two: run.robots, each under its own dir
     const sources = run.robots ?? [{ dir: "robot/", joint_names: run.joint_names,
                                      joints: run.joints, base: run.base, label: robot.label }];
-    for (const src of sources) {
-      const model = await loadRobot(`${DATA}${src.dir}robot.urdf`, (done, total) => {
-        $("loading-text").textContent = `Loading ${src.label ?? "robot"} model… ${done}/${total}`;
-      });
+    const loaded = await Promise.all(sources.map((src) => loadModel(src.dir)));
+    for (const [i, src] of sources.entries()) {
+      const model = loaded[i];
       const rig = { ...prepareRobot(model), jointIdx: [], base: src.base, joints: src.joints };
       src.joint_names.forEach((n, c) => {
         if (model.joints[n]) rig.jointIdx.push([model.joints[n], c]);

@@ -35,6 +35,11 @@ import trimesh
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "docs" / "data"
 LABELS = {"moz1": "Spirit AI Moz1", "g1": "Galbot G1", "duo": "G1 + Moz1"}
+# Per mesh, on top of --face-budget's shared ratio: at most MESH_FACES faces (one
+# detailed source part otherwise stays the page's heaviest download), and no loose
+# pieces under MIN_PART m (invisible at the page's scale; see drop_specks)
+MESH_FACES = 8000
+MIN_PART = 0.005
 # The duo replay's steps, in three groups the page shows side by side: each robot's
 # (record_run.py: "<ns>:<step>" from /<ns>/transfer_demo/phase) and the line's
 # (/duo/phase). [group id, title, [(key, label, description), ...]]
@@ -90,6 +95,17 @@ def resolve_mesh(uri):
     return Path(uri)
 
 
+def drop_specks(mesh, size=MIN_PART):
+    """Without the mesh's loose pieces smaller than `size` (m) every way. The Moz1's
+    gripper_base.stl is 10,590 pieces, 10,089 of them under 1 mm: the simplifier
+    cannot merge across pieces, so it stopped at 22k faces where 6k were asked."""
+    parts = mesh.split(only_watertight=False)
+    keep = [p for p in parts if p.extents.max() >= size]
+    if len(keep) == len(parts) or not keep:
+        return mesh
+    return trimesh.util.concatenate(keep)
+
+
 def decimate(mesh, faces):
     import fast_simplification
     if len(mesh.faces) <= faces:
@@ -138,7 +154,8 @@ def build_robot(urdf_text, out, budget):
             k += 1
             name = f"{stem}_{k}"
         used.add(name.lower())
-        small = decimate(mesh, max(200, int(len(mesh.faces) * ratio)))
+        small = decimate(drop_specks(mesh),
+                         min(MESH_FACES, max(200, int(len(mesh.faces) * ratio))))
         kept += len(small.faces)
         small.export(out / "meshes" / f"{name}.stl")
         for el in meshes[uri]:
@@ -275,12 +292,15 @@ def main():
 
 
 def write_index():
-    """docs/data/index.json: the robots with a replay, Moz1 first."""
+    """docs/data/index.json: the robots with a replay, Moz1 first, each with its
+    model dirs (so the page can fetch the models while run.json downloads)."""
     order = list(LABELS)
     robots = sorted((d.name for d in DATA.iterdir() if (d / "run.json").is_file()),
                     key=lambda r: (order.index(r) if r in order else len(order), r))
     (DATA / "index.json").write_text(json.dumps(
-        {"robots": [{"id": r, "label": LABELS.get(r, r)} for r in robots]}, indent=1))
+        {"robots": [{"id": r, "label": LABELS.get(r, r),
+                     "models": sorted(f"{u.parent.name}/" for u in (DATA / r).glob("*/robot.urdf"))}
+                    for r in robots]}, indent=1))
     print(f"index: {', '.join(robots)}")
 
 

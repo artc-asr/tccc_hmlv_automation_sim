@@ -2,15 +2,25 @@
  "robots": [
   {
    "id": "moz1",
-   "label": "Spirit AI Moz1"
+   "label": "Spirit AI Moz1",
+   "models": [
+    "robot/"
+   ]
   },
   {
    "id": "g1",
-   "label": "Galbot G1"
+   "label": "Galbot G1",
+   "models": [
+    "robot/"
+   ]
   },
   {
    "id": "duo",
-   "label": "G1 + Moz1"
+   "label": "G1 + Moz1",
+   "models": [
+    "robot_g1/",
+    "robot_moz1/"
+   ]
   }
  ]
 }
