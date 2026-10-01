@@ -17,7 +17,7 @@ and lists the robots that have a replay in docs/data/index.json.
 
 Meshes are found from package:// URIs in the workspaces of this repo (any
 directory with that package's package.xml), or absolute file:// paths.
-Needs trimesh and fast_simplification (pip install trimesh fast-simplification).
+Needs trimesh and pymeshlab (pip install trimesh pymeshlab).
 """
 import argparse
 import json
@@ -38,7 +38,7 @@ LABELS = {"moz1": "Spirit AI Moz1", "g1": "Galbot G1", "duo": "G1 + Moz1"}
 # Per mesh, on top of --face-budget's shared ratio: at most MESH_FACES faces (one
 # detailed source part otherwise stays the page's heaviest download), and no loose
 # pieces under MIN_PART m (invisible at the page's scale; see drop_specks)
-MESH_FACES = 8000
+MESH_FACES = 12000
 MIN_PART = 0.005
 # The duo replay's steps, in three groups the page shows side by side: each robot's
 # (record_run.py: "<ns>:<step>" from /<ns>/transfer_demo/phase) and the line's
@@ -107,13 +107,20 @@ def drop_specks(mesh, size=MIN_PART):
 
 
 def decimate(mesh, faces):
-    import fast_simplification
+    """MeshLab's quadric edge collapse, topology kept. fast_simplification took the
+    Moz1's base_link (33 parts, 119k faces) apart below ~30k: at 15k, parts 12 cm
+    off; MeshLab at 12k: 1.7 mm off on average."""
+    import pymeshlab
     if len(mesh.faces) <= faces:
         return mesh
-    v, f = fast_simplification.simplify(mesh.vertices.astype(np.float32),
-                                        mesh.faces.astype(np.int32),
-                                        target_reduction=1.0 - faces / len(mesh.faces))
-    return trimesh.Trimesh(v, f, process=True)
+    ms = pymeshlab.MeshSet()
+    ms.add_mesh(pymeshlab.Mesh(mesh.vertices, mesh.faces))
+    ms.meshing_merge_close_vertices()
+    ms.meshing_decimation_quadric_edge_collapse(
+        targetfacenum=faces, preserveboundary=True, preservenormal=True,
+        preservetopology=True, optimalplacement=True, planarquadric=True, qualitythr=0.3)
+    m = ms.current_mesh()
+    return trimesh.Trimesh(m.vertex_matrix(), m.face_matrix(), process=True)
 
 
 def build_robot(urdf_text, out, budget):
